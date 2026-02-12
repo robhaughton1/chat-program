@@ -35,4 +35,4 @@ Type messages into the client terminal to send them to the server.
 
 # Notes
 
-I added a stopping condition to the progran logic to ensure clean shutdown behavior. 
+I added a stopping condition to the progran logic to ensure clean shutdown behavior. I also chose a TCP connection over UDP because I wanted a reliable connection for this program, rather than unpredictable speed.
