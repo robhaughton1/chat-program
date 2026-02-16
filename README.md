@@ -38,11 +38,11 @@ python3 server.py
 
 python3 client.py
 
-Type messages into the client terminal to send them to the server.
+Type messages into the client terminal to send them to the server. The server can also send messages back.
 
 # Upcoming
-Password hashing (bcrypt)
-Private chats
-Group chat rooms
-Messaging route per user
-Cleaner client UI
+1. Password hashing (bcrypt)
+2. Private chats
+3. Group chat rooms
+4. Messaging route per user
+5. Cleaner client UI
