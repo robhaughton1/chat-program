@@ -1,6 +1,6 @@
 # Chat Program
 
-A simple two file python chat app that deomstrates the basics of client-server communication using sockets. This project was built as part of my coursework to practice networking fundamentals.
+A simple two file python chat app that deomstrates the basics of client-server communication using sockets. This project was built purely for research and on my own times to practice networking fundamentals.
 
 # Overview
 
