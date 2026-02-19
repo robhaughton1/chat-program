@@ -8,7 +8,7 @@ client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insert
 try:
 
     client.connect(("localhost", 5000)) # Port and host binding
-    print("Connected to server. Type 'exit' to leave.\n")
+    print("Please log in.\n")
     
 # Authentication
     attempts = 0
@@ -25,7 +25,15 @@ try:
         response = client.recv(1024).decode()
     
         if "Verified" in response:
-                print("Login succesful!\n")
+                time.sleep(0.5)
+                
+                print("Type /help for commands.\n")
+                time.sleep(0.2)
+                
+                print(f"Welcome, {username}!")
+                
+                
+                
                
                
                 
@@ -36,6 +44,7 @@ try:
                                         data = client.recv(1024)
                                         if not data:
                                                 print("Server disconnected.")
+                                                exit()
                                                 break
                                         print(f"\nServer: {data.decode(errors='replace')}")
                                 except:
@@ -55,10 +64,11 @@ try:
 # Messaging
     while True: 
         while True:
+            time.sleep(1) 
             message = input("Enter your message: ").strip() # User input text 
             
-            if message.lower() == "exit":
-                client.send("exit".encode())
+            if message.lower() == "/exit":
+                client.send("/exit".encode())
                 print("Closing connection...")
                 client.close()
                 exit()
@@ -79,11 +89,17 @@ try:
             break
 
         timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p") # Date formatting
+        
+        COMMANDS = ["/msg", "/who", "/help", "/exit"]
+        
+        is_command = any(message.startswith(cmd) for cmd in COMMANDS)
 
         full_message = f"{message} [{timestamp}]" # Message formatting
     
         client.send(full_message.encode())
-        print("Message sent to server.") 
+        
+        if not is_command:
+                print("Message sent to server.") 
         
 except Exception as e:
 
