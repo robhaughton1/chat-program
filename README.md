@@ -1,6 +1,6 @@
 # Chat Program
 
-A simple two file python chat app that deomstrates the basics of client-server communication using sockets. This project was built as part of my coursework to practice networking fundamentals.
+This project is a python based chat application designed to demonstrate real networking, authentication, and database concepts. It began as a simple socket demo and evolved into a multi client system with secure login, session management, and a real SQLite credential store.
 
 # Overview
 
@@ -14,11 +14,18 @@ The client connects to the server and allows the user to send messages. Each mes
 
 
 # How It Works
+1. Startup
+Binds to local:5000
+Loads users from users.db
+Waits for incoming connections
+Spawns a new thread for each client
 
-The server binds to a host and port, then waits for a client
-The client connects to the server using the same host and port
-Messages that are typed within the client is sent to the server
-The server receives and displays each message
+2. Authentication
+Client sends username and password. Tbe server checks the SQLite database and responds with a Verified on success, and Invalid username or password on failure. After 5 attempts, it responds with Too many attempts.
+
+3. Messaging
+Once authenticated, the client can send messages to the server.
+(Currently group chat; private chat routing coming soon.)
 
 # Running the Program
 
@@ -31,8 +38,11 @@ python3 server.py
 
 python3 client.py
 
-Type messages into the client terminal to send them to the server.
+Type messages into the client terminal to send them to the server. The server can also send messages back.
 
-# Notes
-
-I added a stopping condition to the progran logic to ensure clean shutdown behavior. I also chose a TCP connection over UDP because I wanted a reliable connection for this program, rather than unpredictable speed.
+# Upcoming
+1. Password hashing (bcrypt)
+2. Private chats
+3. Group chat rooms
+4. Messaging route per user
+5. Cleaner client UI
