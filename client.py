@@ -55,7 +55,8 @@ try:
         time.sleep(0.1)
         client.send(password.encode())
     
-        response = client.recv(1024).decode()
+        ciphertext = client.recv(1024).decode()
+        response = decrypt_message(derive_key(password), ciphertext)
     
         if "Verified" in response:
                 session_key = derive_key(password)
@@ -104,7 +105,7 @@ try:
             message = input("Enter your message: ").strip() # User input text 
             
             if message.lower() == "/exit":
-                encrypted = encrypt_message(session_key, "/exit"
+                encrypted = encrypt_message(session_key, "/exit")
                 client.send(encrypted.encode())
                 print("Closing connection...")
                 client.close()
