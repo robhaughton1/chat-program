@@ -86,6 +86,7 @@ def handle_client(conn, addr):
                         stored_hash = VALID_USERS.get(username)
                         
                         if stored_hash and bcrypt.checkpw(password.encode(), stored_hash):
+                                session_key = derive_key(password)
                                 conn.send("Verified.".encode())
                                 print(f"User '{username}' authenticated successfully.")
                                 active_users.add(username)
@@ -125,7 +126,8 @@ def handle_client(conn, addr):
                                                 del user_sockets[username]
                                         break
 	   # Users online
-                                message = data.decode(errors="replace")
+                                raw = data.decode(errors="replace")
+                                message = decrypt_message(session_key, raw)
                                 
                                 raw_message = message.split("[", 1)[0].strip()
                                
@@ -204,5 +206,3 @@ threading.Thread(target=server_broadcast, daemon=True).start()
 while True:
         conn, addr = server.accept()
         threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
-
-	    
