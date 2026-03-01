@@ -87,7 +87,8 @@ def handle_client(conn, addr):
                         
                         if stored_hash and bcrypt.checkpw(password.encode(), stored_hash):
                                 session_key = derive_key(password)
-                                conn.send("Verified.".encode())
+                                encrypted = encrypt_message(session_key, "Verified.")
+                                conn.send(encrypted.encode())
                                 print(f"User '{username}' authenticated successfully.")
                                 active_users.add(username)
                                 connected_clients.append(conn)
@@ -134,9 +135,13 @@ def handle_client(conn, addr):
                                 if raw_message == "/who":
                                         if active_users:
                                                 online = ", ".join(active_users)
-                                                conn.send(f"Online users: {online}".encode())
+                                                response = f"Online users: {online}"
+                                                encrypted = encrypt_message(session_key, response)
+                                                conn.send(encrypted.encode())
                                         else:
-                                                conn.send("No users online.".encode())
+                                                response = "No users online."
+                                                encrypted = encrypt_message(session_key, response)
+                                                conn.send(encrypted.encode())
                                         continue
                                         
                          # Help menue               
@@ -148,7 +153,8 @@ def handle_client(conn, addr):
                                                 "/help - Shows command menu\n"
                                                 "/exit - Disconnect"
                                         )
-                                        conn.send(help_text.encode())
+                                        encrypted = encrypt_message(session_key, help_text)
+                                        conn.send(encrypted.encode())
                                         continue
                                         
                             # Private messages    
@@ -167,21 +173,29 @@ def handle_client(conn, addr):
                                         target_conn = user_sockets[target_user]
                                         
                                         try: 
-                                                target_conn.send(f"[Private] {username}: {private_text}".encode())
-                                                conn.send(f"[Private to {target_user}] {private_text}".encode())
+                                                msg_to_target = f"[Private] {username}: {private_text}"
+                                                msg_to_sender = f"[Private to {target_user}] {private_text}"
+                                                
+                                                encrypted_target = encrypt_message(session_key, msg_to_target)
+                                                encrypted_sender = encypt_message(session_key. msg_to_sender)
+                                                
+                                                target_conn.send(encrypted_target.encode())
+                                                conn.send(encrypted_sender.encode())
                                         except:
                                                 conn.send("Error delivering private message.".encode())
                                         continue
                                         
                                         
-                                if message.lower() == "exit":
+                                if raw_message == "exit":
                                         print("Client requested disconnect.")
                                         active_users.discard(username)
                                         break
 	    
                                 print(f"{username}: {message}")
                                 
-                                conn.send(f"Server received: {message}".encode())
+                                response = f"Server received: {message}"
+                                encrypted = encrypt_message(session_key, response)
+                                conn.send(encrypted.encode())
                                 
                 threading.Thread(target=receive_message, daemon=True).start()
                                
@@ -198,7 +212,8 @@ def server_broadcast():
                 msg = input('')
                 for client in connected_clients:
                         try:
-                                client.send(msg.encode())
+                                encrypted = encrypt_message(session_key, msg)
+                                client.send(encrypted.encode())
                         except:
                                 connected_clients.remove(client)
 threading.Thread(target=server_broadcast, daemon=True).start()
@@ -206,3 +221,5 @@ threading.Thread(target=server_broadcast, daemon=True).start()
 while True:
         conn, addr = server.accept()
         threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+
+	    
