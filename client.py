@@ -58,6 +58,7 @@ try:
         response = client.recv(1024).decode()
     
         if "Verified" in response:
+                session_key = derive_key(password)
                 time.sleep(0.5)
                 
                 print("Type /help for commands.\n")
@@ -79,7 +80,9 @@ try:
                                                 print("Server disconnected.")
                                                 exit()
                                                 break
-                                        print(f"\nServer: {data.decode(errors='replace')}")
+                                        ciphertext = data.decode(errors="replace")
+                                        plaintext = decrypt_message(session_key, ciphertext)
+                                        print(f"\nServer: {plaintext}")
                                 except:
                                         break
                 threading.Thread(target=receive_from_server, daemon=True).start()
@@ -101,7 +104,8 @@ try:
             message = input("Enter your message: ").strip() # User input text 
             
             if message.lower() == "/exit":
-                client.send("/exit".encode())
+                encrypted = encrypt_message(session_key, "/exit"
+                client.send(encrypted.encode())
                 print("Closing connection...")
                 client.close()
                 exit()
@@ -129,7 +133,8 @@ try:
 
         full_message = f"{message} [{timestamp}]" # Message formatting
     
-        client.send(full_message.encode())
+        encrypted = encrypt_message(session_key, full_message)
+        client.send(encrypted.encode())
         
         if not is_command:
                 print("Message sent to server.") 
