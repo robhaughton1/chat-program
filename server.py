@@ -55,6 +55,8 @@ connected_clients = []
 
 user_sockets = {}
 
+user_session_keys = {} 
+
 
 print("Server running with Port 5000...")
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -76,7 +78,10 @@ def handle_client(conn, addr):
                 # Duplicate session prevention
                 
                         if username in active_users:
-                                conn.send("Authentication failed".encode())
+                                temp_key = derive_key(password)
+                                encrypted = encrypt_message(temp_key, "Authentication failed.")
+                                conn.send(encrypted.encode())
+                                
                                 print(f"[DENIED] {username} attempted second login.")
                                 attempts+= 1
                                 continue
@@ -87,6 +92,7 @@ def handle_client(conn, addr):
                         
                         if stored_hash and bcrypt.checkpw(password.encode(), stored_hash):
                                 session_key = derive_key(password)
+                                user_session_keys[username] = session_key
                                 encrypted = encrypt_message(session_key, "Verified.")
                                 conn.send(encrypted.encode())
                                 print(f"User '{username}' authenticated successfully.")
@@ -95,7 +101,9 @@ def handle_client(conn, addr):
                                 user_sockets[username] = conn
                                 break
                         else:
-                                conn.send("Invalid username or password.".encode())
+                                temp_key = derive_keyIpasswordP
+                                encrypted = encrypt_message(temp_key, "Invalid username or password.")
+                                conn.send(encrypted.encode())
                                 print(f"Authentication failed for user '{username}'.")
                                 attempts += 1
                         
@@ -106,7 +114,9 @@ def handle_client(conn, addr):
                         return
              
         if attempts >= 5:
-                conn.send("Too many attempts.".encode())
+                temp_key = derive_key(password)
+                encrypted = encrypt_message(temp_key, "Too many attempts.")
+                conn.send(encrypted.encode())
                 conn.close()
                 return
              
@@ -161,28 +171,40 @@ def handle_client(conn, addr):
                                 if raw_message.startswith("/msg "):
                                         parts = raw_message.split(" ", 2)
                                         if len(parts) < 3:
-                                                conn.send("Usage: /msg <user> <message>".encode())
+                                                sender_key = user_session_keys[username]
+                                                encrypted = encrypt_message(sender_key, "Usage: /msg <user> <message>")
+                                                conn.send(encrypted.encode())
                                                 continue
                                         
                                         target_user = parts[1]
                                         private_text = message.split(" ", 2)[2]
                                         
                                         if target_user not in user_sockets:
-                                                conn.send(f"User {target_user} is not online.".encode())
+                                                sender_key = user_session_keys[username]
+                                                encrypted = encrypt_message(sender_key, f"User {target_user} is not online.")
+                                                conn.send(encrypted.encode())
                                                 continue
+                                                
                                         target_conn = user_sockets[target_user]
                                         
-                                        try: 
+                                        try:
+                                                target_conn = user_sockets[target_user]
+                                                
+                                                target_key = user_session_keys[target_user]
+                                                sender_key = user_session_keys[username]
+                                                
                                                 msg_to_target = f"[Private] {username}: {private_text}"
                                                 msg_to_sender = f"[Private to {target_user}] {private_text}"
+                                              
+                                                encrypted_target = encrypt_message(target_key, msg_to_target)
+                                                encrypted_sender = encrypt_message(sender_key, msg_to_sender)
                                                 
-                                                encrypted_target = encrypt_message(session_key, msg_to_target)
-                                                encrypted_sender = encypt_message(session_key. msg_to_sender)
-                                                
-                                                target_conn.send(encrypted_target.encode())
+                                                target_conn.send(encrypted_target.encode()) 
                                                 conn.send(encrypted_sender.encode())
                                         except:
-                                                conn.send("Error delivering private message.".encode())
+                                                sender_key = user_session_keys[username]
+                                                encrypted = encrypt_message(sender_key, "Error delivering private message.")
+                                                conn.send(encrypted.encode())
                                         continue
                                         
                                         
@@ -207,16 +229,19 @@ def handle_client(conn, addr):
                    print(f"Error with data transfer: {e}")
                    
 def server_broadcast():
-        global connected_clients
         while True:
                 msg = input('')
                 for client in connected_clients:
                         try:
-                                encrypted = encrypt_message(session_key, msg)
+                                key = user_session_keys.get(username)
+                                if not key:
+                                        continue
+                                encrypted = encrypt_message(key, msg)
                                 client.send(encrypted.encode())
                         except:
                                 connected_clients.remove(client)
-threading.Thread(target=server_broadcast, daemon=True).start()
+                                user_sockets.pop(username, None)
+                                user_session_keys.pop(username, None)
 
 while True:
         conn, addr = server.accept()
