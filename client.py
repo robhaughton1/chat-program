@@ -56,7 +56,11 @@ try:
         client.send(password.encode())
     
         ciphertext = client.recv(1024).decode()
-        response = decrypt_message(derive_key(password), ciphertext)
+        
+        try:
+                response = decrypt_message(derive_key(password), ciphertext)
+        except Exception:
+                response = ciphertext
     
         if "Verified" in response:
                 session_key = derive_key(password)
