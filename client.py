@@ -1,113 +1,106 @@
-import socket 
-from datetime import datetime 
+import socket
+from datetime import datetime
 import time # Time validation for security
 import threading
+import base64
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
-import base64
 
 PBKDF2_SALT = b"fixed_salt_for_demo_only"
 PBKDF2_ITERATIONS = 100_000
 KEY_LENGTH = 32
 
 def derive_key(password):
-        return PBKDF2(password, PBKDF2_SALT, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
+    return PBKDF2(password, PBKDF2_SALT, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
 
 def pad(data):
-        pad_len = 16 - (len(data) % 16)
-        return data + bytes([pad_len]) * pad_len
-        
+    pad_len = 16 - (len(data) % 16)
+    return data + bytes([pad_len]) * pad_len
+
 def unpad(data):
-        pad_len = data[-1]
-        return data[:-pad_len]
+    pad_len = data[-1]
+    return data[:-pad_len]
 
 def encrypt_message(key, plaintext):
-        iv = get_random_bytes(16)
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        ciphertext = cipher.encrypt(pad(plaintext.encode()))
-        return base64.b64encode(iv + ciphertext).decode()
+    iv = get_random_bytes(16)
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    ciphertext = cipher.encrypt(pad(plaintext.encode()))
+    return base64.b64encode(iv + ciphertext).decode()
 
 def decrypt_message(key, b64_ciphertext):
-        raw = base64.b64decode(b64_ciphertext.encode())
-        iv = raw[:16]
-        ciphertext = raw[16:]
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        plaintext_padded = cipher.decrypt(ciphertext)
-        return unpad(plaintext_padded).decode(errors="replace")
+    raw = base64.b64decode(b64_ciphertext.encode())
+    iv = raw[:16]
+    ciphertext = raw[16:]
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    plaintext_padded = cipher.decrypt(ciphertext)
+    return unpad(plaintext_padded).decode(errors="replace")
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insertion
 
 try:
-
     client.connect(("localhost", 5000)) # Port and host binding
     print("Please log in.\n")
-    
+
 # Authentication
-    attempts = 0
+    ATTEMPTS = 0
     MAX_ATTEMPTS = 5
-    
-    while attempts < MAX_ATTEMPTS:
+
+    while ATTEMPTS < MAX_ATTEMPTS:
         username = input("Username: ").strip()
         password = input("Password: ").strip()
-    
+
         client.send(username.encode())
         time.sleep(0.1)
         client.send(password.encode())
-    
+
         ciphertext = client.recv(1024).decode()
-        
+
         try:
-                response = decrypt_message(derive_key(password), ciphertext)
+            response = decrypt_message(derive_key(password), ciphertext)
         except Exception:
-                response = ciphertext
-    
+            response = ciphertext
+
         if "Verified" in response:
-                session_key = derive_key(password)
-                time.sleep(0.5)
-                
-                print("Type /help for commands.\n")
-                time.sleep(0.2)
-                
-                print(f"Welcome, {username}!")
-                
-                
-                
-               
-               
-                
-        
-                def receive_from_server():
-                        while True:
-                                try:
-                                        data = client.recv(1024)
-                                        if not data:
-                                                print("Server disconnected.")
-                                                exit()
-                                                break
-                                        ciphertext = data.decode(errors="replace")
-                                        plaintext = decrypt_message(session_key, ciphertext)
-                                        print(f"\nServer: {plaintext}")
-                                except:
-                                        break
-                threading.Thread(target=receive_from_server, daemon=True).start()
-        
-                break
-        
-        else:                                       
-                attempts += 1
-                print(F"Authentication failed; {MAX_ATTEMPTS - attempts}\n left.")
-                
-                if attempts >= MAX_ATTEMPTS:
-                        print("Too many failed attempts. Closing connection...")
-                        client.close()
-                        exit()
+            session_key = derive_key(password)
+            time.sleep(0.5)
+
+            print("Type /help for commands.\n")
+            time.sleep(0.2)
+
+            print(f"Welcome, {username}!")
+
+
+            def receive_from_server():
+                while True:
+                    try:
+                        data = client.recv(1024)
+                        if not data:
+                            print("Server disconnected.")
+                            exit()
+                            break
+                        ciphertext = data.decode(errors="replace")
+                        plaintext = decrypt_message(session_key, ciphertext)
+                        print(f"\nServer: {plaintext}")
+                    except:
+                        break
+            threading.Thread(target=receive_from_server, daemon=True).start()
+
+            break
+        else:
+            ATTEMPTS += 1
+            print(F"Authentication failed; {MAX_ATTEMPTS - ATTEMPTS}\n left.")
+
+            if ATTEMPTS >= MAX_ATTEMPTS:
+                print("Too many failed attempts. Closing connection...")
+                client.close()
+                exit()
 # Messaging
-    while True: 
+    while True:
         while True:
-            time.sleep(1) 
-            message = input("Enter your message: ").strip() # User input text 
-            
+            time.sleep(1)
+            message = input("Enter your message: ").strip() # User input text
+
             if message.lower() == "/exit":
                 encrypted = encrypt_message(session_key, "/exit")
                 client.send(encrypted.encode())
@@ -116,34 +109,34 @@ try:
                 exit()
 
             if not message:
-              print("Message cannot be empty.") # Basic input validation
-              time.sleep(2)
-              continue
-        
+                print("Message cannot be empty.") # Basic input validation
+                time.sleep(2)
+                continue
+
 
             if len(message) > 256:
-              print("Message exceeds max characters.") # Rate limit check
-              time.sleep(2)
-              continue
-   
+                print("Message exceeds max characters.") # Rate limit check
+                time.sleep(2)
+                continue
 
-        
+
+
             break
 
         timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p") # Date formatting
-        
+
         COMMANDS = ["/msg", "/who", "/help", "/exit"]
-        
+
         is_command = any(message.startswith(cmd) for cmd in COMMANDS)
 
         full_message = f"{message} [{timestamp}]" # Message formatting
-    
+
         encrypted = encrypt_message(session_key, full_message)
         client.send(encrypted.encode())
-        
+
         if not is_command:
-                print("Message sent to server.") 
-        
+            print("Message sent to server.")
+
 except Exception as e:
 
     print(f"Error connecting or sending: {e}")
