@@ -62,10 +62,6 @@ def handle_client(conn, addr):
 
             # Duplicate session prevention
             if username in active_users:
-                temp_key = derive_key(password)
-                encrypted = encrypt_message(temp_key, "Authentication failed.")
-                conn.send(encrypted.encode())
-
                 print(f"[DENIED] {username} attempted second login.")
                 attempts+= 1
                 continue
@@ -98,9 +94,7 @@ def handle_client(conn, addr):
             return
 
     if attempts >= 5:
-        temp_key = derive_key(password)
-        encrypted = encrypt_message(temp_key, "Too many attempts.")
-        conn.send(encrypted.encode())
+        conn.send("Too many attempts.".encode())
         conn.close()
         return
 
