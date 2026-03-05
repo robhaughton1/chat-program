@@ -66,7 +66,7 @@ try:
 
         try:
             response = decrypt_message(derive_key(password), ciphertext)
-        except Exception:
+        except Exception: # pylint: disable=broad-exception-caught
             response = ciphertext
 
         if "Verified" in response:
@@ -91,7 +91,7 @@ try:
                         ciphertext = data.decode(errors="replace")
                         plaintext = decrypt_message(session_key, ciphertext)
                         print(f"\nServer: {plaintext}")
-                    except:
+                    except Exception: # pylint: disable=broad-exception-caught
                         break
             threading.Thread(target=receive_from_server, daemon=True).start()
 
@@ -146,7 +146,7 @@ try:
         if not is_command:
             print("Message sent to server.")
 
-except Exception as e:
+except Exception as e: # pylint: disable=broad-exception-caught
 
     print(f"Error connecting or sending: {e}")
 client.close()
