@@ -19,17 +19,17 @@ def derive_key(password, salt):
     return PBKDF2(password, salt, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
 
 def encrypt_message(key, plaintext):
-        cipher = AES.new(key, AES.MODE_GCM)
-        ciphertext, tag = cipher.encrypt_and_digest(plaintext.encode())
-        return base64.b64encode(cipher.nonce + tag + ciphertext).decode()
+    cipher = AES.new(key, AES.MODE_GCM)
+    ciphertext, tag = cipher.encrypt_and_digest(plaintext.encode())
+    return base64.b64encode(cipher.nonce + tag + ciphertext).decode()
 
 def decrypt_message(key, b64_ciphertext):
-        raw = base64.b64decode(b64_ciphertext.encode())
-        nonce = raw[:16]
-        tag = raw[16:32]
-        ciphertext = raw[32:]
-        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
-        return cipher.decrypt_and_verify(ciphertext, tag).decode()
+    raw = base64.b64decode(b64_ciphertext.encode())
+    nonce = raw[:16]
+    tag = raw[16:32]
+    ciphertext = raw[32:]
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    return cipher.decrypt_and_verify(ciphertext, tag).decode()
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insertion
 
@@ -57,6 +57,7 @@ try:
         except Exception: # pylint: disable=broad-exception-caught
             response = ciphertext
 
+
         if "Verified" in response:
             time.sleep(0.5)
             print("Type /help for commands.\n")
@@ -81,7 +82,7 @@ try:
             break
 
         ATTEMPTS += 1
-        print(F"Authentication failed; {MAX_ATTEMPTS - ATTEMPTS}\n left.")
+        print(f"Authentication failed; {MAX_ATTEMPTS - ATTEMPTS} left.")
 
         if ATTEMPTS >= MAX_ATTEMPTS:
             print("Too many failed attempts. Closing connection...")
