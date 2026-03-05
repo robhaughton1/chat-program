@@ -2,7 +2,8 @@
 """Encrypted chat client for secure messaging."""
 import socket
 from datetime import datetime
-import time # Time validation for security
+import time
+import ssl
 import threading
 import base64
 import sys
@@ -44,8 +45,10 @@ def receive_from_server(session_key):
         except Exception: # pylint: disable=broad-exception-caught
             break
 
-
+context = ssl.create_default_context()
+context.load_verify_locations("cert.pem")
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insertion
+client = context.wrap_socket(client, server_hostname="localhost")
 
 try:
     client.connect(("localhost", 5000)) # Port and host binding
