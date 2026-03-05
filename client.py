@@ -6,6 +6,7 @@ import time # Time validation for security
 import threading
 import base64
 import sys
+from getpass import getpass
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
@@ -43,7 +44,7 @@ try:
 
     while ATTEMPTS < MAX_ATTEMPTS:
         username = input("Username: ").strip()
-        password = input("Password: ").strip()
+        password = getpass("Password: ").strip()
 
         client.send(username.encode())
         time.sleep(0.1)
