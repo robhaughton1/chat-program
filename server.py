@@ -9,13 +9,12 @@ from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
 
-PBKDF2_SALT = b"fixed_salt_for_demo_only"
 PBKDF2_ITERATIONS = 100_000
 KEY_LENGTH = 32
 
-def derive_key(password):
+def derive_key(password, salt):
     """Derive a 32-byte AES key from the given password."""
-    return PBKDF2(password, PBKDF2_SALT, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
+    return PBKDF2(password, salt, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
 
 def encrypt_message(key, plaintext):
     cipher = AES.new(key, AES.MODE_GCM)
@@ -35,10 +34,10 @@ def decrypt_message(key, b64_ciphertext):
 def load_users():
     conn = sqlite3.connect("users.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT username, password FROM users")
+    cursor.execute("SELECT username, password, salt FROM users")
     rows = cursor.fetchall()
     conn.close()
-    return {username: password for username, password in rows}
+    return {username: (password, salt) for username, password, salt in rows}
 
 VALID_USERS = load_users()
 active_users = set()
@@ -74,6 +73,12 @@ def handle_client(conn, addr):
                 # Credentials
 
             stored_hash = VALID_USERS.get(username)
+            stored = VALID_USERS.get(username)
+            if stored:
+                stored_hash, salt_hex = stored
+                salt = bytes.fromhex(salt_hex)
+                if bcrypt.checkpw(password.encode(), stored_hash):
+                    session_key = derive_key(password.encode(), salt)
 
             if stored_hash and bcrypt.checkpw(password.encode(), stored_hash):
                 session_key = derive_key(password)
