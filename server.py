@@ -15,27 +15,18 @@ KEY_LENGTH = 32
 def derive_key(password):
         return PBKDF2(password, PBKDF2_SALT, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
 
-def pad(data):
-        pad_len = 16 - (len(data) % 16)
-        return data + bytes([pad_len]) * pad_len
-        
-def unpad(data):
-        pad_len = data[-1]
-        return data[:-pad_len]
-
 def encrypt_message(key, plaintext):
-        iv = get_random_bytes(16)
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        ciphertext = cipher.encrypt(pad(plaintext.encode()))
-        return base64.b64encode(iv + ciphertext).decode()
+        cipher = AES.new(key, AES.MODE_GCM)
+        ciphertext, tag = cipher.encrypt_and_digest(plaintext.encode())
+        return base64.b64encode(cipher.nonce + tag + ciphertext).decode()
 
 def decrypt_message(key, b64_ciphertext):
         raw = base64.b64decode(b64_ciphertext.encode())
-        iv = raw[:16]
-        ciphertext = raw[16:]
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        plaintext_padded = cipher.decrypt(ciphertext)
-        return unpad(plaintext_padded).decode(errors="replace")
+        nonce = raw[:16]
+        tag = raw[16:32]
+        ciphertext = raw[32:]
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+        return cipher.decrypt_and_verify(ciphertext, tag).decode()
 
 # Database user fetching
 
