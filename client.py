@@ -9,7 +9,6 @@ import sys
 from getpass import getpass
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Random import get_random_bytes
 
 PBKDF2_ITERATIONS = 100_000
 KEY_LENGTH = 32
@@ -43,9 +42,22 @@ try:
 
     while ATTEMPTS < MAX_ATTEMPTS:
         username = input("Username: ").strip()
-        password = getpass("Password: ").strip()
+        if not username:
+            print("Username cannot be empty.")
+            time.sleep(1)
+            continue
+        while True:
+            password = getpass("Password: ").strip()
+            if not password:
+                print("Password cannot be empty.")
+                time.sleep(1)
+                continue
+            break
         client.send(username.encode())
         salt_hex = client.recv(1024).decode().strip()
+        if salt_hex == "INVALID_USER":
+            print("Invalid username or password.")
+            continue
         salt = bytes.fromhex(salt_hex)
         session_key = derive_key(password.encode(), salt)
         time.sleep(0.1)
@@ -56,7 +68,6 @@ try:
             response = decrypt_message(session_key, ciphertext)
         except Exception: # pylint: disable=broad-exception-caught
             response = ciphertext
-
 
         if "Verified" in response:
             time.sleep(0.5)
