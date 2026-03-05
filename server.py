@@ -58,7 +58,6 @@ def handle_client(conn, addr):
     while attempts < 5:
         try:
             username = conn.recv(1024).decode().strip()
-            password = conn.recv(1024).decode().strip()
 
             # Duplicate session prevention
             if username in active_users:
@@ -69,21 +68,25 @@ def handle_client(conn, addr):
                 # Credentials
             stored = VALID_USERS.get(username)
             if stored:
-                stored_hash, salt_hex = stored
-                salt = bytes.fromhex(salt_hex)
-                if bcrypt.checkpw(password.encode(), stored_hash):
-                    session_key = derive_key(password.encode(), salt)
-                    user_session_keys[username] = session_key
-                    encrypted = encrypt_message(session_key, "Verified.")
-                    conn.send(encrypted.encode())
-                    print(f"User '{username}' authenticated successfully.")
-                    active_users.add(username)
-                    connected_clients.append(conn)
-                    user_sockets[username] = conn
-                    break
+                _, salt_hex = stored
+                conn.send(salt_hex.encode())
+            else:
+                conn.send(get_random_bytes(16).hex().encode())
+            password = conn.recv(1024).decode().strip()
+            stored_hash, salt_hex = stored
+            salt = bytes.fromhex(salt_hex)
+            if bcrypt.checkpw(password.encode(), stored_hash):
+                session_key = derive_key(password.encode(), salt)
+                user_session_keys[username] = session_key
+                encrypted = encrypt_message(session_key, "Verified.")
+                conn.send(encrypted.encode())
+                print(f"User '{username}' authenticated successfully.")
+                active_users.add(username)
+                connected_clients.append(conn)
+                user_sockets[username] = conn
+                break
 
-            encrypted = encrypt_message(derive_key(b"temp", get_random_bytes(16)), "Invalid username or password.")
-            conn.send(encrypted.encode())
+            conn.send("Invalid username or password.")
             print(f"Authentication failed for user '{username}'.")
             attempts += 1
 
@@ -94,7 +97,7 @@ def handle_client(conn, addr):
             return
 
     if attempts >= 5:
-        conn.send("Too many attempts.".encode())
+        conn.send("too many attempts.".encode())
         conn.close()
         return
 
