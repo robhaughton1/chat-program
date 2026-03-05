@@ -101,7 +101,7 @@ def handle_client(conn, addr):
                                 user_sockets[username] = conn
                                 break
                         else:
-                                temp_key = derive_keyIpasswordP
+                                temp_key = derive_key(password)
                                 encrypted = encrypt_message(temp_key, "Invalid username or password.")
                                 conn.send(encrypted.encode())
                                 print(f"Authentication failed for user '{username}'.")
@@ -208,7 +208,7 @@ def handle_client(conn, addr):
                                         continue
                                         
                                         
-                                if raw_message == "exit":
+                                if raw_message == "/exit":
                                         print("Client requested disconnect.")
                                         active_users.discard(username)
                                         break
