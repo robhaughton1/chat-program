@@ -68,7 +68,7 @@ def handle_client(conn, addr):
             else:
                 conn.send(get_random_bytes(16).hex().encode())
             password = conn.recv(1024).decode().strip()
-            
+
             if username in active_users:
                 print(f"[DENIED] {username} attempted second login.")
                 conn.send("Authentication failed.".encode())
@@ -77,7 +77,7 @@ def handle_client(conn, addr):
 
             stored_hash, salt_hex = stored
             salt = bytes.fromhex(salt_hex)
-            
+
             if bcrypt.checkpw(password.encode(), stored_hash):
                 session_key = derive_key(password.encode(), salt)
                 user_session_keys[username] = session_key
