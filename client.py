@@ -1,8 +1,11 @@
+# pylint: disable=import-error
+"""Encrypted chat client for secure messaging."""
 import socket
 from datetime import datetime
 import time # Time validation for security
 import threading
 import base64
+import sys
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
@@ -12,23 +15,28 @@ PBKDF2_ITERATIONS = 100_000
 KEY_LENGTH = 32
 
 def derive_key(password):
+    """Derive a 32-byte AES key from the given password."""
     return PBKDF2(password, PBKDF2_SALT, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
 
 def pad(data):
+    """Apply PKCS#7 padding to the given byte string."""
     pad_len = 16 - (len(data) % 16)
     return data + bytes([pad_len]) * pad_len
 
 def unpad(data):
+    """Remove PKCS#7 padding from decrypted data."""
     pad_len = data[-1]
     return data[:-pad_len]
 
 def encrypt_message(key, plaintext):
+    """Encrypt a plaintext string using AES-CBC and return base64 output."""
     iv = get_random_bytes(16)
     cipher = AES.new(key, AES.MODE_CBC, iv)
     ciphertext = cipher.encrypt(pad(plaintext.encode()))
     return base64.b64encode(iv + ciphertext).decode()
 
 def decrypt_message(key, b64_ciphertext):
+    """Decrypt a base64-encoded AAES-CBC ciphertext and return plaintext."""
     raw = base64.b64decode(b64_ciphertext.encode())
     iv = raw[:16]
     ciphertext = raw[16:]
@@ -72,13 +80,14 @@ try:
 
 
             def receive_from_server():
+                """Background thread that receives and decrypts messages from the server."""
                 while True:
                     try:
                         data = client.recv(1024)
                         if not data:
                             print("Server disconnected.")
-                            exit()
-                            break
+                            sys.exit()
+
                         ciphertext = data.decode(errors="replace")
                         plaintext = decrypt_message(session_key, ciphertext)
                         print(f"\nServer: {plaintext}")
@@ -87,14 +96,14 @@ try:
             threading.Thread(target=receive_from_server, daemon=True).start()
 
             break
-        else:
-            ATTEMPTS += 1
-            print(F"Authentication failed; {MAX_ATTEMPTS - ATTEMPTS}\n left.")
 
-            if ATTEMPTS >= MAX_ATTEMPTS:
-                print("Too many failed attempts. Closing connection...")
-                client.close()
-                exit()
+        ATTEMPTS += 1
+        print(F"Authentication failed; {MAX_ATTEMPTS - ATTEMPTS}\n left.")
+
+        if ATTEMPTS >= MAX_ATTEMPTS:
+            print("Too many failed attempts. Closing connection...")
+            client.close()
+            sys.exit()
 # Messaging
     while True:
         while True:
@@ -106,7 +115,7 @@ try:
                 client.send(encrypted.encode())
                 print("Closing connection...")
                 client.close()
-                exit()
+                sys.exit()
 
             if not message:
                 print("Message cannot be empty.") # Basic input validation
