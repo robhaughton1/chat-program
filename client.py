@@ -11,13 +11,12 @@ from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
 
-PBKDF2_SALT = b"fixed_salt_for_demo_only"
 PBKDF2_ITERATIONS = 100_000
 KEY_LENGTH = 32
 
-def derive_key(password):
+def derive_key(password, salt):
     """Derive a 32-byte AES key from the given password."""
-    return PBKDF2(password, PBKDF2_SALT, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
+    return PBKDF2(password, salt, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
 
 def encrypt_message(key, plaintext):
         cipher = AES.new(key, AES.MODE_GCM)
@@ -45,29 +44,26 @@ try:
     while ATTEMPTS < MAX_ATTEMPTS:
         username = input("Username: ").strip()
         password = getpass("Password: ").strip()
-
         client.send(username.encode())
+        salt_hex = client.recv(1024).decode().strip()
+        salt = bytes.fromhex(salt_hex)
+        session_key = derive_key(password.encode(), salt)
         time.sleep(0.1)
         client.send(password.encode())
-
         ciphertext = client.recv(1024).decode()
 
         try:
-            response = decrypt_message(derive_key(password), ciphertext)
+            response = decrypt_message(session_key, ciphertext)
         except Exception: # pylint: disable=broad-exception-caught
             response = ciphertext
 
         if "Verified" in response:
-            session_key = derive_key(password)
             time.sleep(0.5)
-
             print("Type /help for commands.\n")
             time.sleep(0.2)
-
             print(f"Welcome, {username}!")
 
-
-            def receive_from_server():
+            def receive_from_server(session_key):
                 """Background thread that receives and decrypts messages from the server."""
                 while True:
                     try:
@@ -75,13 +71,12 @@ try:
                         if not data:
                             print("Server disconnected.")
                             sys.exit()
-
                         ciphertext = data.decode(errors="replace")
                         plaintext = decrypt_message(session_key, ciphertext)
                         print(f"\nServer: {plaintext}")
                     except Exception: # pylint: disable=broad-exception-caught
                         break
-            threading.Thread(target=receive_from_server, daemon=True).start()
+            threading.Thread(target=receive_from_server, args=(session_key,), daemon=True).start()
 
             break
 
