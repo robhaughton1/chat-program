@@ -30,6 +30,21 @@ def decrypt_message(key, b64_ciphertext):
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     return cipher.decrypt_and_verify(ciphertext, tag).decode()
 
+def receive_from_server(session_key):
+    """Background thread that receives and decrypts messages from the server."""
+    while True:
+        try:
+            data = client.recv(1024)
+            if not data:
+                print("Server disconnected.")
+                sys.exit()
+            ciphertext = data.decode(errors="replace")
+            plaintext = decrypt_message(session_key, ciphertext)
+            print(f"\nServer: {plaintext}")
+        except Exception: # pylint: disable=broad-exception-caught
+            break
+
+
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insertion
 
 try:
@@ -74,20 +89,6 @@ try:
             print("Type /help for commands.\n")
             time.sleep(0.2)
             print(f"Welcome, {username}!")
-
-            def receive_from_server(session_key):
-                """Background thread that receives and decrypts messages from the server."""
-                while True:
-                    try:
-                        data = client.recv(1024)
-                        if not data:
-                            print("Server disconnected.")
-                            sys.exit()
-                        ciphertext = data.decode(errors="replace")
-                        plaintext = decrypt_message(session_key, ciphertext)
-                        print(f"\nServer: {plaintext}")
-                    except Exception: # pylint: disable=broad-exception-caught
-                        break
             threading.Thread(target=receive_from_server, args=(session_key,), daemon=True).start()
 
             break
