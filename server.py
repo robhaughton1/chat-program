@@ -188,7 +188,8 @@ def handle_client(conn, addr):
 
                         target_conn.send(encrypted_target.encode())
                         conn.send(encrypted_sender.encode())
-                    except:
+                    except Exception as e:
+                        print(f"Private message error: {e}")
                         sender_key = user_session_keys[username]
                         encrypted = encrypt_message(sender_key, "Error delivering private message.")
                         conn.send(encrypted.encode())
@@ -212,21 +213,6 @@ def handle_client(conn, addr):
 
     except Exception as e:
         print(f"Error with data transfer: {e}")
-
-def server_broadcast():
-    while True:
-        msg = input('')
-        for client in connected_clients:
-            try:
-                key = user_session_keys.get(username)
-                if not key:
-                    continue
-                encrypted = encrypt_message(key, msg)
-                client.send(encrypted.encode())
-            except:
-                connected_clients.remove(client)
-                user_sockets.pop(username, None)
-                user_session_keys.pop(username, None)
 
 while True:
     conn, addr = server.accept()
