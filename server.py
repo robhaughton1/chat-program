@@ -58,6 +58,9 @@ def handle_client(conn, addr):
     while attempts < 5:
         try:
             username = conn.recv(1024).decode().strip()
+            if not username or not VALID_USERS.get(username):
+                conn.send("INVALID_USER".encode())
+                continue
 
 
                 # Credentials
@@ -73,6 +76,9 @@ def handle_client(conn, addr):
                 print(f"[DENIED] {username} attempted second login.")
                 conn.send("Authentication failed.".encode())
                 attempts+= 1
+                continue
+            if not username or not stored:
+                conn.send("invalid username or password.".encode())
                 continue
 
             stored_hash, salt_hex = stored
