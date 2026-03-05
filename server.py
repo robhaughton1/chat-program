@@ -2,6 +2,7 @@
 import socket
 import threading
 import time
+import ssl
 import sqlite3
 import base64
 import bcrypt
@@ -46,9 +47,12 @@ user_sockets = {}
 user_session_keys = {}
 
 print("Server running with Port 5000...")
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(("localhost", 5000))
 server.listen(1)
+server = context.wrap_socket(server, server_side=True)
 
 def handle_client(conn, addr):
     print(f"Client connected with address{addr}.")
