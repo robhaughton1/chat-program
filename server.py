@@ -71,28 +71,22 @@ def handle_client(conn, addr):
                 continue
 
                 # Credentials
-
-            stored_hash = VALID_USERS.get(username)
             stored = VALID_USERS.get(username)
             if stored:
                 stored_hash, salt_hex = stored
                 salt = bytes.fromhex(salt_hex)
                 if bcrypt.checkpw(password.encode(), stored_hash):
                     session_key = derive_key(password.encode(), salt)
+                    user_session_keys[username] = session_key
+                    encrypted = encrypt_message(session_key, "Verified.")
+                    conn.send(encrypted.encode())
+                    print(f"User '{username}' authenticated successfully.")
+                    active_users.add(username)
+                    connected_clients.append(conn)
+                    user_sockets[username] = conn
+                    break
 
-            if stored_hash and bcrypt.checkpw(password.encode(), stored_hash):
-                session_key = derive_key(password)
-                user_session_keys[username] = session_key
-                encrypted = encrypt_message(session_key, "Verified.")
-                conn.send(encrypted.encode())
-                print(f"User '{username}' authenticated successfully.")
-                active_users.add(username)
-                connected_clients.append(conn)
-                user_sockets[username] = conn
-                break
-
-            temp_key = derive_key(password)
-            encrypted = encrypt_message(temp_key, "Invalid username or password.")
+            encrypted = encrypt_message(derive_key(b"temp", get_random_bytes(16)), "Invalid username or password.")
             conn.send(encrypted.encode())
             print(f"Authentication failed for user '{username}'.")
             attempts += 1
