@@ -18,31 +18,18 @@ def derive_key(password):
     """Derive a 32-byte AES key from the given password."""
     return PBKDF2(password, PBKDF2_SALT, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
 
-def pad(data):
-    """Apply PKCS#7 padding to the given byte string."""
-    pad_len = 16 - (len(data) % 16)
-    return data + bytes([pad_len]) * pad_len
-
-def unpad(data):
-    """Remove PKCS#7 padding from decrypted data."""
-    pad_len = data[-1]
-    return data[:-pad_len]
-
 def encrypt_message(key, plaintext):
-    """Encrypt a plaintext string using AES-CBC and return base64 output."""
-    iv = get_random_bytes(16)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    ciphertext = cipher.encrypt(pad(plaintext.encode()))
-    return base64.b64encode(iv + ciphertext).decode()
+        cipher = AES.new(key, AES.MODE_GCM)
+        ciphertext, tag = cipher.encrypt_and_digest(plaintext.encode())
+        return base64.b64encode(cipher.nonce + tag + ciphertext).decode()
 
 def decrypt_message(key, b64_ciphertext):
-    """Decrypt a base64-encoded AAES-CBC ciphertext and return plaintext."""
-    raw = base64.b64decode(b64_ciphertext.encode())
-    iv = raw[:16]
-    ciphertext = raw[16:]
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    plaintext_padded = cipher.decrypt(ciphertext)
-    return unpad(plaintext_padded).decode(errors="replace")
+        raw = base64.b64decode(b64_ciphertext.encode())
+        nonce = raw[:16]
+        tag = raw[16:32]
+        ciphertext = raw[32:]
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+        return cipher.decrypt_and_verify(ciphertext, tag).decode()
 
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insertion
 
