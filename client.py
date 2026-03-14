@@ -101,7 +101,7 @@ try:
             break
 
         ATTEMPTS += 1
-        print(f"Authentication failed; {MAX_ATTEMPTS - ATTEMPTS} left.")
+        print(f"Invalid username or password.")
 
         if ATTEMPTS >= MAX_ATTEMPTS:
             print("Too many failed attempts. Closing connection...")
