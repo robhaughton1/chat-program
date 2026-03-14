@@ -45,7 +45,11 @@ def receive_from_server(session_key):
         except Exception: # pylint: disable=broad-exception-caught
             break
 
-context = ssl.create_default_context()
+context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+context.minimum_version = ssl.TLSVersion.TLSv1_2
+if hasattr(ssl, "OP_NO_COMPRESSION"):
+    context.options |= ssl.OP_NO_COMPRESSION
+context.check_hostname = True
 context.load_verify_locations("cert.pem")
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insertion
 client = context.wrap_socket(client, server_hostname="localhost")
