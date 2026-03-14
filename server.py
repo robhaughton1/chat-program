@@ -48,10 +48,13 @@ user_session_keys = {}
 
 print("Server running with Port 5000...")
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.minimum_version = ssl.TLSVersion.TLSv1_2
+if hasattr(ssl, "OP_NO_COMPRESSION"):
+    context.options |= ssl.OP_NO_COMPRESSION  
 context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(("localhost", 5000))
-server.listen(1)
+server.listen(5)
 server = context.wrap_socket(server, server_side=True)
 
 def handle_client(conn, addr):
@@ -127,11 +130,16 @@ def handle_client(conn, addr):
                         connected_clients.remove(conn)
                     if username in user_sockets:
                         del user_sockets[username]
+                        user_session_keys.pop(username, None)
                     break
 	   # Users online
                 raw = data.decode(errors="replace")
                 message = decrypt_message(session_key, raw)
                 raw_message = message.split("[", 1)[0].strip()
+                if len(raw_message) > 256:
+                    encrypted = encrypted_message(session_key, "Message exceeds max characters.")
+                    conn.send(encrypted.encode())
+                    continue
 
                 if raw_message == "/who":
                     if active_users:
@@ -202,6 +210,12 @@ def handle_client(conn, addr):
                 if raw_message == "/exit":
                     print("Client requested disconnect.")
                     active_users.discard(username)
+                    if conn in connected_clients:
+                        connected_clients.remove(conn)
+                    if username in user_sockets:
+                        del user_sockets[username]
+                        user_session_keys.pop(username, None)
+                    conn.close()
                     break
 
                 print(f"{username}: {message}")
