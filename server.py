@@ -65,7 +65,6 @@ def store_message(sender, recipient, message, msg_type, timestamp):
     """, (sender, recipient, message, msg_type, timestamp))
     conn.commit()
     conn.close()
-
 def get_recent_messages(username, limit=20):
     conn = sqlite3.connect("chat.db")
     cursor = conn.cursor()
@@ -80,6 +79,25 @@ def get_recent_messages(username, limit=20):
     rows = cursor.fetchall()
     conn.close()
     rows.reverse()
+    return rows
+
+def get_private_convo(user1, user2, limit=20):
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT sender, recipient, message, timestamp
+        FROM messages
+        WHERE msg_type = 'private'
+            AND (
+                    (sender = ? AND recipient = ?)
+                    OR
+                    (sender = ? AND recipient = ?)
+            )
+        ORDER BY id ASC
+        LIMIT ?
+    """, (user1, user2, user2, user1, limit))
+    rows = cursor.fetchall()
+    conn.close()
     return rows
 
 VALID_USERS = load_users()
@@ -124,7 +142,7 @@ def handle_client(conn, addr):
 
             if username in active_users:
                 print(f"[DENIED] {username} attempted second login.")
-                conn.send("Authentication failed".encode())
+                conn.send("Authentication failed.".encode())
                 attempts+= 1
                 continue
             if not username or not stored:
@@ -165,7 +183,7 @@ def handle_client(conn, addr):
             return
 
     if attempts >= 5:
-        conn.send("Too many attempts.".encode())
+        conn.send("too many attempts.".encode())
         conn.close()
         return
 
@@ -213,6 +231,7 @@ def handle_client(conn, addr):
                         "/who - List online users\n"
                         "/help - Shows command menu\n"
                         "/exit - Disconnect"
+                        "/history <user> - Shows private conversation history\n"
                     )
                     encrypted = encrypt_message(session_key, help_text)
                     conn.send(encrypted.encode())
@@ -260,6 +279,27 @@ def handle_client(conn, addr):
                         sender_key = user_session_keys[username]
                         encrypted = encrypt_message(sender_key, "Error delivering private message.")
                         conn.send(encrypted.encode())
+                    continue
+
+                if raw_message.startswith("/history "):
+                    parts = raw_message.split(" ", 1)
+                    if len(parts) < 2 or not parts[1].strip():
+                        encrypted = encryp_message(session_key, "Usage: /history <user>")
+                        conn.send(encrypted.encode())
+                        continue
+                    target_user = parts[1].strip()
+                    conversation_rows = get_private_convo(username, target_user)
+                    if not conversation_rows:
+                        encrypted = encrypt_message(session_key, f"No private conversation history with {target_user}.")
+                        conn.send(encrypted.encode())
+                        continue
+                    history_lines = [f"--- Private conversation with {target_user} ---"]
+                    for sender, recipient, msg, timestamp in conversation_rows:
+                        history_lines.append(f"[{timestamp}] {sender}: {msg}")
+
+                    history_text = "\n".join(history_lines)
+                    encrypted = encrypt_message(session_key, history_text)
+                    conn.send(encrypted.encode())
                     continue
 
                 if raw_message == "/exit":
