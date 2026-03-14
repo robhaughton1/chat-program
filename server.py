@@ -30,7 +30,7 @@ def decrypt_message(key, b64_ciphertext):
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     return cipher.decrypt_and_verify(ciphertext, tag).decode()
 
-# Database user fetching
+# Database password and message history fetching
 
 def load_users():
     conn = sqlite3.connect("users.db")
@@ -40,7 +40,49 @@ def load_users():
     conn.close()
     return {username: (password, salt) for username, password, salt in rows}
 
+def init_messages_db():
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender TEXT NOT NULL,
+            recipient TEXT,
+            message TEXT NOT NULL,
+            msg_type TEXT NOT NULL,
+            timestamp TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+def store_message(sender, recipient, message, msg_type, timestamp):
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO messages (sender, recipient, message, msg_type, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+    """, (sender, recipient, message, msg_type, timestamp))
+    conn.commit()
+    conn.close()
+def get_recent_messages(username, limit=20):
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT sender, message, timestamp
+        FROM messages
+        WHERE msg_type = 'public'
+        ORDER BY id DESC
+        LIMIT ?
+    """, (limit,))
+    rows = cursor.fetchall()
+    conn.close()
+    rows.reverse()
+    return rows
+
 VALID_USERS = load_users()
+init_messages_db()
 active_users = set()
 connected_clients = []
 user_sockets = {}
@@ -100,6 +142,15 @@ def handle_client(conn, addr):
                 active_users.add(username)
                 connected_clients.append(conn)
                 user_sockets[username] = conn
+                history_rows = get_recent_messages(username)
+                if history_rows:
+                    history_lines = ["---Global Chat History ---"]
+                    for sender, msg, timestamp in history_rows:
+                        history_lines.append(f"[{timestamp}] {sender}: {msg}")
+
+                    history_text = "\n".join(history_lines)
+                    encrypted_history = encrypt_message(session_key, history_text)
+                    conn.send(encrypted_history.encode())
                 break
 
             conn.send("Invalid username or password.".encode())
@@ -219,7 +270,8 @@ def handle_client(conn, addr):
                     break
 
                 print(f"{username}: {message}")
-
+                timestamp = time.strftime("%Y-%m-%d %I:%M:%S %p")
+                store_message(username, None, raw_message, "public", timestamp)
                 response = f"Server received: {message}"
                 encrypted = encrypt_message(session_key, response)
                 conn.send(encrypted.encode())
