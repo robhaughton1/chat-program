@@ -101,7 +101,7 @@ try:
             break
 
         ATTEMPTS += 1
-        print(f"Invalid username or password.")
+        print(f"Authentication failed; {MAX_ATTEMPTS - ATTEMPTS} left.")
 
         if ATTEMPTS >= MAX_ATTEMPTS:
             print("Too many failed attempts. Closing connection...")
@@ -137,7 +137,7 @@ try:
 
         timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p") # Date formatting
 
-        COMMANDS = ["/msg", "/who", "/help", "/exit"]
+        COMMANDS = ["/msg", "/who", "/help", "/exit", "/history"]
 
         is_command = any(message.startswith(cmd) for cmd in COMMANDS)
 
