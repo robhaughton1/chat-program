@@ -65,6 +65,7 @@ def store_message(sender, recipient, message, msg_type, timestamp):
     """, (sender, recipient, message, msg_type, timestamp))
     conn.commit()
     conn.close()
+
 def get_recent_messages(username, limit=20):
     conn = sqlite3.connect("chat.db")
     cursor = conn.cursor()
@@ -123,7 +124,7 @@ def handle_client(conn, addr):
 
             if username in active_users:
                 print(f"[DENIED] {username} attempted second login.")
-                conn.send("Authentication failed.".encode())
+                conn.send("Authentication failed".encode())
                 attempts+= 1
                 continue
             if not username or not stored:
@@ -164,7 +165,7 @@ def handle_client(conn, addr):
             return
 
     if attempts >= 5:
-        conn.send("too many attempts.".encode())
+        conn.send("Too many attempts.".encode())
         conn.close()
         return
 
