@@ -227,7 +227,7 @@ def handle_client(conn, addr):
                         continue
 
                     target_user = parts[1]
-                    private_text = message.split(" ", 2)[2]
+                    private_text = raw_message.split(" ", 2)[2]
 
                     if target_user not in user_sockets:
                         sender_key = user_session_keys[username]
@@ -242,6 +242,9 @@ def handle_client(conn, addr):
 
                         target_key = user_session_keys[target_user]
                         sender_key = user_session_keys[username]
+                        
+                        timestamp = time.strftime("%Y-%m-%d %I:%M:%S %p")
+                        store_message(username, target_user, private_text, "private", timestamp)
 
                         msg_to_target = f"[Private] {username}: {private_text}"
                         msg_to_sender = f"[Private to {target_user}] {private_text}"
