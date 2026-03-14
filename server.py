@@ -137,7 +137,7 @@ def handle_client(conn, addr):
                 message = decrypt_message(session_key, raw)
                 raw_message = message.split("[", 1)[0].strip()
                 if len(raw_message) > 256:
-                    encrypted = encrypted_message(session_key, "Message exceeds max characters.")
+                    encrypted = encrypt_message(session_key, "Message exceeds max characters.")
                     conn.send(encrypted.encode())
                     continue
 
