@@ -347,17 +347,17 @@ def handle_client(conn, addr):
                         encrypted = encrypt_message(session_key, "Usage: @ai <question>")
                         conn.send(encrypted.encode())
                         continue
-                try:        
-                    ai_reply = get_ai_response(prompt)
-                    encrypted = encrypt_message(session_key, f"Artemis: {ai_reply}")
-                    conn.send(encrypted.encode())
-                except Exception as e:
-                    print(f"AI error: {e}")
-                    encrypted = encrypt_message(
-                        session_key, "Artemis is unavailable right now. Check if Ollama is running."
-                    )
-                    conn.send(encrypted.encode())
-                continue
+                    try:        
+                        ai_reply = get_ai_response(prompt)
+                        encrypted = encrypt_message(session_key, f"Artemis: {ai_reply}")
+                        conn.send(encrypted.encode())
+                    except Exception as e:
+                        print(f"AI error: {e}")
+                        encrypted = encrypt_message(
+                            session_key, "Artemis is unavailable right now. Check if Ollama is running."
+                        )
+                        conn.send(encrypted.encode())
+                    continue
 
                 if raw_message == "/exit":
                     print("Client requested disconnect.")
@@ -373,9 +373,6 @@ def handle_client(conn, addr):
                 print(f"{username}: {message}")
                 timestamp = time.strftime("%Y-%m-%d %I:%M:%S %p")
                 store_message(username, None, raw_message, "public", timestamp)
-                response = f"Server received: {message}"
-                encrypted = encrypt_message(session_key, response)
-                conn.send(encrypted.encode())
 
         threading.Thread(target=receive_message, daemon=True).start()
 
