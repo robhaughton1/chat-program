@@ -163,7 +163,7 @@ def handle_client(conn, addr):
                 attempts+= 1
                 continue
             if not username or not stored:
-                conn.send("invalid username or password.".encode())
+                conn.send("Invalid username or password.".encode())
                 continue
 
             stored_hash, salt_hex = stored
@@ -200,7 +200,7 @@ def handle_client(conn, addr):
             return
 
     if attempts >= 5:
-        conn.send("too many attempts.".encode())
+        conn.send("Too many attempts.".encode())
         conn.close()
         return
 
