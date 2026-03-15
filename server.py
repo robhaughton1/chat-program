@@ -6,12 +6,17 @@ import ssl
 import sqlite3
 import base64
 import bcrypt
+import os
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
 
 PBKDF2_ITERATIONS = 100_000
 KEY_LENGTH = 32
+STORAGE_KEY = os.getenv("CHAT_DB_KEY")
+if not STORAGE_KEY:
+    raise ValueError("CHAT_DB_KEY environment variable is not set.")
+STORAGE_KEY = STORAGE_KEY.encode()
 
 def derive_key(password, salt):
     """Derive a 32-byte AES key from the given password."""
@@ -29,6 +34,14 @@ def decrypt_message(key, b64_ciphertext):
     ciphertext = raw[32:]
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     return cipher.decrypt_and_verify(ciphertext, tag).decode()
+
+def encrypt_at_rest(plaintext):
+    """Encrypt private message text before storing it in the database."""
+    return encrypt_message(STORAGE_KEY, plaintext)
+
+def decrypt_at_rest(ciphertext):
+    """Decrypt private message text after reading it from the database."""
+    return decrypt_message(STORAGE_KEY, ciphertext)
 
 # Database password and message history fetching
 
@@ -98,7 +111,11 @@ def get_private_convo(user1, user2, limit=20):
     """, (user1, user2, user2, user1, limit))
     rows = cursor.fetchall()
     conn.close()
-    return rows
+    decrypted_rows = []
+    for sender, recipient, message, timestamp in rows:
+        decrypted_message = decrypt_at_rest(message)
+        decrypted_rows.append((sender, recipient, decrypted_message, timestamp))
+    return decrypted_rows
 
 VALID_USERS = load_users()
 init_messages_db()
@@ -111,7 +128,7 @@ print("Server running with Port 5000...")
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 context.minimum_version = ssl.TLSVersion.TLSv1_2
 if hasattr(ssl, "OP_NO_COMPRESSION"):
-    context.options |= ssl.OP_NO_COMPRESSION  
+    context.options |= ssl.OP_NO_COMPRESSION
 context.load_cert_chain(certfile="cert.pem", keyfile="key.pem")
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind(("localhost", 5000))
@@ -230,7 +247,7 @@ def handle_client(conn, addr):
                         "/msg <user> <message - Private message\n"
                         "/who - List online users\n"
                         "/help - Shows command menu\n"
-                        "/exit - Disconnect"
+                        "/exit - Disconnect\n"
                         "/history <user> - Shows private conversation history\n"
                     )
                     encrypted = encrypt_message(session_key, help_text)
@@ -262,15 +279,20 @@ def handle_client(conn, addr):
 
                         target_key = user_session_keys[target_user]
                         sender_key = user_session_keys[username]
-                        
+
                         timestamp = time.strftime("%Y-%m-%d %I:%M:%S %p")
-                        store_message(username, target_user, private_text, "private", timestamp)
+                        encrypted_private = encrypt_at_rest(private_text)
+                        store_message(username, target_user, encrypted_private, "private", timestamp)
+                        conversation_rows = get_private_convo(username, target_user)
+                        history_lines= [f"--- Private Conversation with {target_user} ---"]
+                        for sender, recipient, msg, timestamp in conversation_rows:
+                            history_lines.append(f"[{timestamp}] {sender}: {msg}")
+                        conversation_text = "\n".join(history_lines)
 
                         msg_to_target = f"[Private] {username}: {private_text}"
-                        msg_to_sender = f"[Private to {target_user}] {private_text}"
 
                         encrypted_target = encrypt_message(target_key, msg_to_target)
-                        encrypted_sender = encrypt_message(sender_key, msg_to_sender)
+                        encrypted_sender = encrypt_message(sender_key, conversation_text)
 
                         target_conn.send(encrypted_target.encode())
                         conn.send(encrypted_sender.encode())
@@ -284,7 +306,7 @@ def handle_client(conn, addr):
                 if raw_message.startswith("/history "):
                     parts = raw_message.split(" ", 1)
                     if len(parts) < 2 or not parts[1].strip():
-                        encrypted = encryp_message(session_key, "Usage: /history <user>")
+                        encrypted = encrypt_message(session_key, "Usage: /history <user>")
                         conn.send(encrypted.encode())
                         continue
                     target_user = parts[1].strip()
