@@ -7,6 +7,7 @@ import ssl
 import threading
 import base64
 import sys
+import struct
 from getpass import getpass
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
@@ -31,21 +32,41 @@ def decrypt_message(key, b64_ciphertext):
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     return cipher.decrypt_and_verify(ciphertext, tag).decode()
 
+def recv_exact(sock, size):
+    data = b""
+    while len(data) < size:
+        chunk = sock.recv(size - len(data))
+        if not chunk:
+            raise ConnectionError("Socket closed during recv.")
+        data += chunk
+    return data
+
+def send_packet(sock,text):
+    data = text.encode()
+    header = struct.pack("!I", len(data))
+    sock.sendall(header + data)
+
+def recv_packet(sock):
+    header = recv_exact(sock, 4)
+    length = struct.unpack("!I", header)[0]
+    data = recv_exact(sock, length)
+    return data.decode()
+
 def receive_from_server(session_key):
     """Background thread that receives and decrypts messages from the server."""
     global waiting_for_ai
     while True:
         try:
-            data = client.recv(1024)
-            if not data:
+            ciphertext = recv_packet(client)
+            if not ciphertext:
                 print("Server disconnected.")
                 sys.exit()
-            ciphertext = data.decode(errors="replace")
             plaintext = decrypt_message(session_key, ciphertext)
             print(f"\n{plaintext}")
             if plaintext.startswith("Artemis: "):
                 waiting_for_ai = False
-        except Exception: # pylint: disable=broad-exception-caught
+        except Exception as e: # pylint: disable=broad-exception-caught
+            print(f"Receive thread error: {e}")
             break
 
 context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
@@ -79,16 +100,16 @@ try:
                 time.sleep(1)
                 continue
             break
-        client.send(username.encode())
-        salt_hex = client.recv(1024).decode().strip()
+        send_packet(client, username)
+        salt_hex = recv_packet(client).strip()
         if salt_hex == "INVALID_USER":
             print("Invalid username or password.")
             continue
         salt = bytes.fromhex(salt_hex)
         session_key = derive_key(password.encode(), salt)
         time.sleep(0.1)
-        client.send(password.encode())
-        ciphertext = client.recv(1024).decode()
+        send_packet(client, password)
+        ciphertext = recv_packet(client)
 
         try:
             response = decrypt_message(session_key, ciphertext)
@@ -117,13 +138,13 @@ try:
             time.sleep(1)
 
             if waiting_for_ai:
-                print("waiting for Artemis to respond...")
+                print("Waiting for Artemis to respond...")
                 time.sleep(1)
                 continue
 
             message = input("Enter your message: ").strip() # User input text
             
-            if message.startswith("@ai "):
+            if message.startswith("@ai"):
                 if message.strip() == "@ai":
                     print("usage: @ai <question>")
                     time.sleep(1)
@@ -132,7 +153,7 @@ try:
 
             if message.lower() == "/exit":
                 encrypted = encrypt_message(session_key, "/exit")
-                client.send(encrypted.encode())
+                send_packet(client, encrypted)
                 print("Closing connection...")
                 client.close()
                 sys.exit()
@@ -161,7 +182,7 @@ try:
         full_message = f"{message} [{timestamp}]" # Message formatting
 
         encrypted = encrypt_message(session_key, full_message)
-        client.send(encrypted.encode())
+        send_packet(client, encrypted)
 
         if not is_command:
             print("Message sent to server.")
