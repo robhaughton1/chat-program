@@ -286,7 +286,7 @@ def handle_client(conn, addr):
                         "/help - Shows command menu\n"
                         "/exit - Disconnect\n"
                         "/history <user> - Shows private conversation history\n"
-n                       "@ai <question> - Conversate with Artemis AI\n"
+                        "@ai <question> - Conversate with Artemis AI\n"
                     )
                     encrypted = encrypt_message(session_key, help_text)
                     send_packet(conn, encrypted)
