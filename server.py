@@ -7,6 +7,7 @@ import ssl
 import sqlite3
 import base64
 import bcrypt
+import struct
 import os
 import subprocess
 from Crypto.Cipher import AES
@@ -36,6 +37,26 @@ def decrypt_message(key, b64_ciphertext):
     ciphertext = raw[32:]
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
     return cipher.decrypt_and_verify(ciphertext, tag).decode()
+
+def recv_exact(sock, size):
+    data = b""
+    while len(data) < size:
+        chunk = sock.recv(size - len(data))
+        if not chunk:
+            raise ConnectionError("Socket closed during recv.")
+        data += chunk
+    return data
+
+def send_packet(sock,text):
+    data = text.encode()
+    header = struct.pack("!I", len(data))
+    sock.sendall(header + data)
+
+def recv_packet(sock):
+    header = recv_exact(sock, 4)
+    length = struct.unpack("!I", header)[0]
+    data = recv_exact(sock, length)
+    return data.decode()
 
 def encrypt_at_rest(plaintext):
     """Encrypt private message text before storing it in the database."""
@@ -159,9 +180,9 @@ def handle_client(conn, addr):
     attempts = 0
     while attempts < 5:
         try:
-            username = conn.recv(1024).decode().strip()
+            username = recv_packet(conn).strip()
             if not username or not VALID_USERS.get(username):
-                conn.send("INVALID_USER".encode())
+                send_packet(conn, "INVALID_USER")
                 continue
 
 
@@ -169,18 +190,18 @@ def handle_client(conn, addr):
             stored = VALID_USERS.get(username)
             if stored:
                 _, salt_hex = stored
-                conn.send(salt_hex.encode())
+                send_packet(conn, salt_hex)
             else:
-                conn.send(get_random_bytes(16).hex().encode())
-            password = conn.recv(1024).decode().strip()
+                send_packet(conn, get_random_bytes(16).hex())
+            password = recv_packet(conn).strip()
 
             if username in active_users:
                 print(f"[DENIED] {username} attempted second login.")
-                conn.send("Authentication failed.".encode())
+                send_packet(conn, "Authentication failed.")
                 attempts+= 1
                 continue
             if not username or not stored:
-                conn.send("invalid username or password.".encode())
+                send_packet(conn, "Invalid username or password.")
                 continue
 
             stored_hash, salt_hex = stored
@@ -190,7 +211,7 @@ def handle_client(conn, addr):
                 session_key = derive_key(password.encode(), salt)
                 user_session_keys[username] = session_key
                 encrypted = encrypt_message(session_key, "Verified.")
-                conn.send(encrypted.encode())
+                send_packet(conn, encrypted)
                 print(f"User '{username}' authenticated successfully.")
                 active_users.add(username)
                 connected_clients.append(conn)
@@ -203,10 +224,10 @@ def handle_client(conn, addr):
 
                     history_text = "\n".join(history_lines)
                     encrypted_history = encrypt_message(session_key, history_text)
-                    conn.send(encrypted_history.encode())
+                    send_packet(conn, encrypted_history)
                 break
 
-            conn.send("Invalid username or password.".encode())
+            send_packet(conn, "Invalid username or password.")
             print(f"Authentication failed for user '{username}'.")
             attempts += 1
 
@@ -217,7 +238,7 @@ def handle_client(conn, addr):
             return
 
     if attempts >= 5:
-        conn.send("too many attempts.".encode())
+        send_packet(conn, "Too many attempts.")
         conn.close()
         return
 
@@ -226,8 +247,8 @@ def handle_client(conn, addr):
     try:
         def receive_message():
             while True:
-                data = conn.recv(1024)
-                if not data:
+                raw = recv_packet(conn)
+                if not raw:
                     print("Client disconnected.")
                     active_users.discard(username)
                     if conn in connected_clients:
@@ -237,12 +258,11 @@ def handle_client(conn, addr):
                         user_session_keys.pop(username, None)
                     break
 	   # Users online
-                raw = data.decode(errors="replace")
                 message = decrypt_message(session_key, raw)
                 raw_message = message.split("[", 1)[0].strip()
                 if len(raw_message) > 256:
                     encrypted = encrypt_message(session_key, "Message exceeds max characters.")
-                    conn.send(encrypted.encode())
+                    send_packet(conn, encrypted)
                     continue
 
                 if raw_message == "/who":
@@ -250,25 +270,26 @@ def handle_client(conn, addr):
                         online = ", ".join(active_users)
                         response = f"Online users: {online}"
                         encrypted = encrypt_message(session_key, response)
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                     else:
                         response = "No users online."
                         encrypted = encrypt_message(session_key, response)
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                     continue
 
                      #Help menu
                 if raw_message == "/help":
                     help_text = (
-                        "Available commands:\n"
+                        "--- Available Commands ---\n"
                         "/msg <user> <message - Private message\n"
                         "/who - List online users\n"
                         "/help - Shows command menu\n"
                         "/exit - Disconnect\n"
                         "/history <user> - Shows private conversation history\n"
+n                       "@ai <question> - Conversate with Artemis AI\n"
                     )
                     encrypted = encrypt_message(session_key, help_text)
-                    conn.send(encrypted.encode())
+                    send_packet(conn, encrypted)
                     continue
 
                     # Private messages
@@ -277,7 +298,7 @@ def handle_client(conn, addr):
                     if len(parts) < 3:
                         sender_key = user_session_keys[username]
                         encrypted = encrypt_message(sender_key, "Usage: /msg <user> <message>")
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                         continue
 
                     target_user = parts[1]
@@ -286,7 +307,7 @@ def handle_client(conn, addr):
                     if target_user not in user_sockets:
                         sender_key = user_session_keys[username]
                         encrypted = encrypt_message(sender_key, f"User {target_user} not online.")
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                         continue
 
                     target_conn = user_sockets[target_user]
@@ -311,26 +332,26 @@ def handle_client(conn, addr):
                         encrypted_target = encrypt_message(target_key, msg_to_target)
                         encrypted_sender = encrypt_message(sender_key, conversation_text)
 
-                        target_conn.send(encrypted_target.encode())
-                        conn.send(encrypted_sender.encode())
+                        send_packet(target_conn, encrypted_target)
+                        send_packet(conn, encrypted_sender)
                     except Exception as e:
                         print(f"Private message error: {e}")
                         sender_key = user_session_keys[username]
                         encrypted = encrypt_message(sender_key, "Error delivering private message.")
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                     continue
 
                 if raw_message.startswith("/history "):
                     parts = raw_message.split(" ", 1)
                     if len(parts) < 2 or not parts[1].strip():
                         encrypted = encrypt_message(session_key, "Usage: /history <user>")
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                         continue
                     target_user = parts[1].strip()
                     conversation_rows = get_private_convo(username, target_user)
                     if not conversation_rows:
                         encrypted = encrypt_message(session_key, f"No private conversation history with {target_user}.")
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                         continue
                     history_lines = [f"--- Private conversation with {target_user} ---"]
                     for sender, recipient, msg, timestamp in conversation_rows:
@@ -338,25 +359,25 @@ def handle_client(conn, addr):
 
                     history_text = "\n".join(history_lines)
                     encrypted = encrypt_message(session_key, history_text)
-                    conn.send(encrypted.encode())
+                    send_packet(conn, encrypted)
                     continue
 
                 if raw_message.startswith("@ai "):
                     prompt = raw_message[len("@ai "):].strip()
                     if not prompt:
                         encrypted = encrypt_message(session_key, "Usage: @ai <question>")
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                         continue
                     try:        
                         ai_reply = get_ai_response(prompt)
                         encrypted = encrypt_message(session_key, f"Artemis: {ai_reply}")
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                     except Exception as e:
                         print(f"AI error: {e}")
                         encrypted = encrypt_message(
                             session_key, "Artemis is unavailable right now. Check if Ollama is running."
                         )
-                        conn.send(encrypted.encode())
+                        send_packet(conn, encrypted)
                     continue
 
                 if raw_message == "/exit":
