@@ -42,7 +42,7 @@ def receive_from_server(session_key):
                 sys.exit()
             ciphertext = data.decode(errors="replace")
             plaintext = decrypt_message(session_key, ciphertext)
-            print(f"\nServer: {plaintext}")
+            print(f"\n{plaintext}")
             if plaintext.startswith("Artemis: "):
                 waiting_for_ai = False
         except Exception: # pylint: disable=broad-exception-caught
