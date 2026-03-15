@@ -33,6 +33,7 @@ def decrypt_message(key, b64_ciphertext):
 
 def receive_from_server(session_key):
     """Background thread that receives and decrypts messages from the server."""
+    global waiting_for_ai
     while True:
         try:
             data = client.recv(1024)
@@ -42,6 +43,8 @@ def receive_from_server(session_key):
             ciphertext = data.decode(errors="replace")
             plaintext = decrypt_message(session_key, ciphertext)
             print(f"\nServer: {plaintext}")
+            if plaintext.startswith("Artemis: "):
+                waiting_for_ai = False
         except Exception: # pylint: disable=broad-exception-caught
             break
 
@@ -53,6 +56,7 @@ context.check_hostname = True
 context.load_verify_locations("cert.pem")
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insertion
 client = context.wrap_socket(client, server_hostname="localhost")
+waiting_for_ai = False
 
 try:
     client.connect(("localhost", 5000)) # Port and host binding
@@ -111,7 +115,20 @@ try:
     while True:
         while True:
             time.sleep(1)
+
+            if waiting_for_ai:
+                print("waiting for Artemis to respond...")
+                time.sleep(1)
+                continue
+
             message = input("Enter your message: ").strip() # User input text
+            
+            if message.startswith("@ai "):
+                if message.strip() == "@ai":
+                    print("usage: @ai <question>")
+                    time.sleep(1)
+                    continue
+                waiting_for_ai = True
 
             if message.lower() == "/exit":
                 encrypted = encrypt_message(session_key, "/exit")
@@ -137,7 +154,7 @@ try:
 
         timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p") # Date formatting
 
-        COMMANDS = ["/msg", "/who", "/help", "/exit", "/history"]
+        COMMANDS = ["/msg", "/who", "/help", "/exit", "/history", "@ai"]
 
         is_command = any(message.startswith(cmd) for cmd in COMMANDS)
 
