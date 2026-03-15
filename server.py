@@ -2,11 +2,13 @@
 import socket
 import threading
 import time
+import json
 import ssl
 import sqlite3
 import base64
 import bcrypt
 import os
+import subprocess
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
@@ -135,6 +137,21 @@ server.bind(("localhost", 5000))
 server.listen(5)
 server = context.wrap_socket(server, server_side=True)
 
+def get_ai_response(prompt):
+    try:
+        result = subprocess.run(
+            ["ollama", "run", "artemis", prompt],
+            capture_output=True,
+            text=True
+        )
+        reply = result.stdout.strip()
+
+        if not reply:
+            return "Artemis is thinking..."
+        return reply
+    except Exception as e:
+        return f"Artemis error: {e}"
+
 def handle_client(conn, addr):
     print(f"Client connected with address{addr}.")
 
@@ -163,7 +180,7 @@ def handle_client(conn, addr):
                 attempts+= 1
                 continue
             if not username or not stored:
-                conn.send("Invalid username or password.".encode())
+                conn.send("invalid username or password.".encode())
                 continue
 
             stored_hash, salt_hex = stored
@@ -200,7 +217,7 @@ def handle_client(conn, addr):
             return
 
     if attempts >= 5:
-        conn.send("Too many attempts.".encode())
+        conn.send("too many attempts.".encode())
         conn.close()
         return
 
@@ -323,6 +340,24 @@ def handle_client(conn, addr):
                     encrypted = encrypt_message(session_key, history_text)
                     conn.send(encrypted.encode())
                     continue
+
+                if raw_message.startswith("@ai "):
+                    prompt = raw_message[len("@ai "):].strip()
+                    if not prompt:
+                        encrypted = encrypt_message(session_key, "Usage: @ai <question>")
+                        conn.send(encrypted.encode())
+                        continue
+                try:        
+                    ai_reply = get_ai_response(prompt)
+                    encrypted = encrypt_message(session_key, f"Artemis: {ai_reply}")
+                    conn.send(encrypted.encode())
+                except Exception as e:
+                    print(f"AI error: {e}")
+                    encrypted = encrypt_message(
+                        session_key, "Artemis is unavailable right now. Check if Ollama is running."
+                    )
+                    conn.send(encrypted.encode())
+                continue
 
                 if raw_message == "/exit":
                     print("Client requested disconnect.")
