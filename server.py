@@ -247,8 +247,9 @@ def handle_client(conn, addr):
     try:
         def receive_message():
             while True:
-                raw = recv_packet(conn)
-                if not raw:
+                try:
+                    raw = recv_packet(conn)
+                except ConnectionError:
                     print("Client disconnected.")
                     active_users.discard(username)
                     if conn in connected_clients:
@@ -397,8 +398,7 @@ def handle_client(conn, addr):
 
         threading.Thread(target=receive_message, daemon=True).start()
 
-        while True:
-            time.sleep(1)
+        time.sleep(1)
 
     except Exception as e:
         print(f"Error with data transfer: {e}")
