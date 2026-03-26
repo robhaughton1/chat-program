@@ -8,8 +8,8 @@ import sqlite3
 import base64
 import bcrypt
 import struct
+import requests
 import os
-import subprocess
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
@@ -158,20 +158,63 @@ server.bind(("localhost", 5000))
 server.listen(5)
 server = context.wrap_socket(server, server_side=True)
 
-def get_ai_response(prompt):
+def load_system_prompt():
     try:
-        result = subprocess.run(
-            ["ollama", "run", "artemis", prompt],
-            capture_output=True,
-            text=True
-        )
-        reply = result.stdout.strip()
+        with open("system_prompt.txt", "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception as e:
+        print(f"System prompt load error: {e}")
+        return "You are Artemis, a helpful AI assistant."
 
-        if not reply:
-            return "Artemis is thinking..."
-        return reply
+def ai_response(prompt):
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        return ("Artemis error: API key not set.")
+
+    system_prompt = load_system_prompt()
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+    
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": "meta-llama/llama-3.2-3b-instruct:free",
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "max_tokens": 150
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        choice = data["choices"][0]
+        message = choice.get("message", {})
+        content = message.get("content")
+
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+
+        return "Artemis is thinking, but no visible reply was returned."
+
+        if content is None:
+            return f"Artemis error: unexpected API response: {data}"
+        return content.strip()
     except Exception as e:
         return f"Artemis error: {e}"
+    
 
 def handle_client(conn, addr):
     print(f"Client connected with address{addr}.")
@@ -370,13 +413,13 @@ def handle_client(conn, addr):
                         send_packet(conn, encrypted)
                         continue
                     try:        
-                        ai_reply = get_ai_response(prompt)
+                        ai_reply = ai_response(prompt)
                         encrypted = encrypt_message(session_key, f"Artemis: {ai_reply}")
                         send_packet(conn, encrypted)
                     except Exception as e:
                         print(f"AI error: {e}")
                         encrypted = encrypt_message(
-                            session_key, "Artemis is unavailable right now. Check if Ollama is running."
+                            session_key, "Artemis is unavailable right now. Please try again later."
                         )
                         send_packet(conn, encrypted)
                     continue
