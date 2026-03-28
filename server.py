@@ -537,6 +537,7 @@ def handle_client(conn, addr):
                         "owner": username,
                         "members": {username}
                     }
+					create_group_db(group_name, username)
 
                     encrypted = encrypt_message(session_key, f"Group '{group_name}' created.")
                     send_packet(conn, encrypted)
