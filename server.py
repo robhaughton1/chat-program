@@ -519,6 +519,7 @@ def handle_client(conn, addr):
                         "/gmsg <group_name> <message> - Send message to group\n"
                         "/groups - List your groups\n"
                         "/group_leave <group_name> - Leave a group\n"
+						"/group_history <group_name> - Show group chat history\n"
                     )
                     encrypted = encrypt_message(session_key, help_text)
                     send_packet(conn, encrypted)
@@ -766,40 +767,40 @@ def handle_client(conn, addr):
                     continue
 
 				if raw_message.startswith("/group_history "):
-    parts = raw_message.split(" ", 1)
+    			parts = raw_message.split(" ", 1)
 
-    if len(parts) < 2 or not parts[1].strip():
-        encrypted = encrypt_message(session_key, "Usage: /group_history <group_name>")
-        send_packet(conn, encrypted)
-        continue
+   				if len(parts) < 2 or not parts[1].strip():
+        			encrypted = encrypt_message(session_key, "Usage: /group_history <group_name>")
+        			send_packet(conn, encrypted)
+        			continue
 
-    group_name = parts[1].strip()
+    			group_name = parts[1].strip()
 
-    if group_name not in groups:
-        encrypted = encrypt_message(session_key, f"Group '{group_name}' does not exist.")
-        send_packet(conn, encrypted)
-        continue
+    			if group_name not in groups:
+        			encrypted = encrypt_message(session_key, f"Group '{group_name}' does not exist.")
+        			send_packet(conn, encrypted)
+        			continue
 
-    if username not in groups[group_name]["members"]:
-        encrypted = encrypt_message(session_key, f"You are not a member of '{group_name}'.")
-        send_packet(conn, encrypted)
-        continue
+    			if username not in groups[group_name]["members"]:
+        			encrypted = encrypt_message(session_key, f"You are not a member of '{group_name}'.")
+        			send_packet(conn, encrypted)
+        			continue
 
-    group_rows = get_group_messages(group_name)
+    			group_rows = get_group_messages(group_name)
 
-    if not group_rows:
-        encrypted = encrypt_message(session_key, f"No group history found for '{group_name}'.")
-        send_packet(conn, encrypted)
-        continue
+    			if not group_rows:
+        			encrypted = encrypt_message(session_key, f"No group history found for '{group_name}'.")
+        			send_packet(conn, encrypted)
+        			continue
 
-    history_lines = [f"--- Group History: {group_name} ---"]
-    for sender, recipient, msg, timestamp in group_rows:
-        history_lines.append(f"[{timestamp}] {sender}: {msg}")
+    			history_lines = [f"--- Group History: {group_name} ---"]
+    			for sender, recipient, msg, timestamp in group_rows:
+        			history_lines.append(f"[{timestamp}] {sender}: {msg}")
 
-    history_text = "\n".join(history_lines)
-    encrypted = encrypt_message(session_key, history_text)
-    send_packet(conn, encrypted)
-    continue
+    			history_text = "\n".join(history_lines)
+    			encrypted = encrypt_message(session_key, history_text)
+    			send_packet(conn, encrypted)
+    			continue
 
                 if raw_message.startswith("@ai "):
                     prompt = raw_message[len("@ai "):].strip()
