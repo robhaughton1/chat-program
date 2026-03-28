@@ -433,6 +433,7 @@ def handle_client(conn, addr):
 
                         if group_name in groups:
                             groups[group_name]["members"].add(username)
+							add_group_member_db(group_name, username)
                             encrypted = encrypt_message(session_key, f"You joined group '{group_name}'.")
                             send_packet(conn, encrypted)
 
@@ -454,11 +455,13 @@ def handle_client(conn, addr):
                         encrypted = encrypt_message(session_key, f"You declinded the invite to '{group_name}'.")
                         send_packet(conn, encrypted)
                         if inviter in user_sockets:
+	
                             inviter_conn = user_sockets[inviter]
                             inviter_key = user_session_keys[inviter]
                             notice = f"{username} declined your request to join '{group_name}'."
                             encrypted_notice = encrypt_message(inviter_key, notice)
                             send_packet(inviter_conn, encrypted_notice)
+
                         del pending_group_requests[username]
                         continue
 
@@ -694,6 +697,7 @@ def handle_client(conn, addr):
                         continue
 
                     group["members"].remove(username)
+					remove_group_member_db(group_name, username)
                     encrypted = encrypt_message(session_key, f"You left group '{group_name}'.")
                     send_packet(conn, encrypted)
                     continue
