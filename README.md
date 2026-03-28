@@ -93,3 +93,11 @@ Requirements
 
 ```bash
 pip install pycryptodome bcrypt requests
+
+## Environment setup
+
+export CHAT_DB_KEY="0123456789abcdef0123456789abcdef"
+
+For windows:
+
+set CHAT_DB_KEY="0123456789abcdef0123456789abcdef"
