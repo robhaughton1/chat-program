@@ -578,7 +578,7 @@ def handle_client(conn, addr):
 
                     if len(parts) < 2 or not parts[1].strip():
                         encrypted = encrypt_message(session_key, "Usage: /group_leave <group_name>")
-                        send_packets(conn, encrypted)
+                        send_packet(conn, encrypted)
                         continue
 
                     group_name = parts[1].strip()
@@ -611,7 +611,7 @@ def handle_client(conn, addr):
 
                     if len(parts) < 3:
                        encrypted = encrypt_message(session_key, "Usage: /gmsg <group_name> <message>")
-                       send_packets(conn, encrypted)
+                       send_packet(conn, encrypted)
                        continue
 
                     group_name = parts[1].strip()
