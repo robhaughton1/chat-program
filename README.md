@@ -1,63 +1,95 @@
 # Chat Program
 
-A python based chat application designed to demonstrate real networking, authentication, and database concepts. It began as a simple socket demo and evolved into a multi client system with secure login, session management, and a SQLite credential store.
+A Python secure chat application built to demonstrate networking, authentication, encryption, persistence, and access control in a multi user system.
 
-# Overview
+## Features
 
-The program consists of two components:
+Multi client chat server using sockets and threading  
+Secure client server communication  
+User authentication with hashed credentials  
+Session based encrypted messaging  
+Public and private messaging  
+Private conversation history  
+Group chat with invite and approval flow  
+Persistent groups and membership  
+Group message history  
+Encrypted storage for sensitive messages  
+Duplicate login prevention  
 
-1. server.py
-Handles incoming client connections, authenticates users, and manages message routing. Runs continuously until stopped.
-2. client.py
-Connects to the server and sends messages over a TCP socket.
+## Project Structure
 
+server.py  
+Handles connections, authentication, message routing, group management, and persistence  
 
-# How It Works
-1. Startup
-Binds to local:5000
-Loads users from users.db
-Waits for incoming connections
-Spawns a new thread for each client
+client.py  
+Connects to the server, handles user input, and displays messages  
 
-2. Authentication
-Client sends username and password
-Server validates credentials against SQLite
-Responds with Verified on success
-Responds with Invalid username or password on failure
+users.db  
+Stores user credentials  
 
+chat.db  
+Stores messages, groups, and membership data  
 
-4. Messaging
-Once authenticated, the client can send messages to the server in a global fashion. However, there is private messaging aswell.
+## Commands
 
+General  
+/help  
+Show available commands  
 
-# Running the Program
+/who  
+List online users  
 
-Open two terminals:
-## Terminal 1 - Start the server
+/exit  
+Disconnect  
 
-python3 server.py
+Private messaging  
+/msg <user> <message>  
+Send a private message  
 
-## Terminal 2 - Start the client
+/history <user>  
+View private conversation history  
 
-python3 client.py
+Group chat  
+/group_create <group_name>  
+Create a group  
 
-Type messages into the client terminal to send them to the server. The server can also send messages back.
+/group_add <group_name> <user>  
+Invite a user  
 
-# Upcoming
-1. Password hashing (bcrypt)
-2. Private chats
-3. Group chat rooms
-4. Messaging route per user
-5. Cleaner client UI
+yes or no  
+Accept or decline a group invite  
 
-# Purpose
+/groups  
+List your groups  
 
-This project was built to practice real world networking and security. It focuses on socket programming, multi-client handling, authentication flows, and clean message routing.
+/gmsg <group_name> <message>  
+Send a group message  
 
-# What I Learned
+/group_history <group_name>  
+View group message history  
 
-1. How to build multi client server using threads
-2. How to design a simple authentication flow backed by SQLite
-3. How to structure message handling for future private routing
-4. How to seperate ckient/server responsibilities cleanly
-5. How to think about security early (hashing, lockouts, session management)
+/group_leave <group_name>  
+Leave a group  
+
+AI  
+@ai <question>  
+Send a prompt to the assistant  
+
+## How It Works
+
+The server starts and waits for client connections  
+
+A client connects and authenticates with a username and password  
+
+After authentication, the client can send messages and commands  
+
+The server routes messages, enforces access control, and retrieves stored data when needed  
+
+Messages and group data remain available after restart  
+
+## Running the Program
+
+Requirements
+
+```bash
+pip install pycryptodome bcrypt requests
