@@ -98,6 +98,45 @@ def init_messages_db():
     conn.commit()
     conn.close()
 
+def init_groups_db():
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS groups (
+            group_name TEXT PRIMARY KEY,
+            owner TEXT NOT NULL
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS group_members (
+            group_name TEXT NOT NULL,
+            username TEXT NOT NULL,
+            PRIMARY KEY (group_name, username)
+        )
+    """)
+
+    conn.commit()
+    conn.close()
+
+def create_group_db(group_name, owner):
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT INTO groups (group_name, owner)
+        VALUES (?, ?)
+    """, (group_name, owner))
+
+    cursor.execute("""
+        INSERT INTO group_members (group_name, username)
+        VALUES (?, ?)
+    """, (group_name, owner))
+
+    conn.commit()
+    conn.close()
+
 def store_message(sender, recipient, message, msg_type, timestamp):
     conn = sqlite3.connect("chat.db")
     cursor = conn.cursor()
@@ -107,6 +146,7 @@ def store_message(sender, recipient, message, msg_type, timestamp):
     """, (sender, recipient, message, msg_type, timestamp))
     conn.commit()
     conn.close()
+
 def get_recent_messages(username, limit=20):
     conn = sqlite3.connect("chat.db")
     cursor = conn.cursor()
@@ -148,6 +188,7 @@ def get_private_convo(user1, user2, limit=20):
 
 VALID_USERS = load_users()
 init_messages_db()
+init_groups_db()
 active_users = set()
 connected_clients = []
 user_sockets = {}
