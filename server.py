@@ -137,6 +137,32 @@ def create_group_db(group_name, owner):
     conn.commit()
     conn.close()
 
+def load_groups():
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT group_name, owner FROM groups")
+    group_rows = cursor.fetchall()
+
+    cursor.execute("SELECT group_name, username FROM group_members")
+    member_rows = cursor.fetchall()
+
+    conn.close()
+
+    loaded_groups = {}
+
+    for group_name, owner in group_rows:
+        loaded_groups[group_name] = {
+            "owner": owner,
+            "members": set()
+        }
+
+    for group_name, username in member_rows:
+        if group_name in loaded_groups:
+            loaded_groups[group_name]["members"].add(username)
+
+    return loaded_groups
+
 def store_message(sender, recipient, message, msg_type, timestamp):
     conn = sqlite3.connect("chat.db")
     cursor = conn.cursor()
