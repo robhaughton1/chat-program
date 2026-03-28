@@ -236,6 +236,28 @@ def get_private_convo(user1, user2, limit=20):
         decrypted_rows.append((sender, recipient, decrypted_message, timestamp))
     return decrypted_rows
 
+def get_group_messages(group_name, limit=20):
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT sender, recipient, message, timestamp
+        FROM messages
+        WHERE msg_type = 'group' AND recipient = ?
+        ORDER BY id ASC
+        LIMIT ?
+    """, (group_name, limit))
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    decrypted_rows = []
+    for sender, recipient, message, timestamp in rows:
+        decrypted_message = decrypt_at_rest(message)
+        decrypted_rows.append((sender, recipient, decrypted_message, timestamp))
+
+    return decrypted_rows
+
 VALID_USERS = load_users()
 init_messages_db()
 init_groups_db()
