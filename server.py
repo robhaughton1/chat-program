@@ -219,7 +219,7 @@ active_users = set()
 connected_clients = []
 user_sockets = {}
 user_session_keys = {}
-groups = {}
+groups = load_groups()
 pending_group_requests = {}
 
 print("Server running with Port 5000...")
