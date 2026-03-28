@@ -175,7 +175,7 @@ try:
 
         timestamp = datetime.now().strftime("%Y-%m-%d %I:%M:%S %p") # Date formatting
 
-        COMMANDS = ["/msg", "/who", "/help", "/exit", "/history", "@ai"]
+        COMMANDS = ["/msg", "/who", "/help", "/exit", "/history", "@ai", "/group_create", "/group_add", "/gmsg", "/groups", "/group_leave", "/group_history"]
 
         is_command = any(message.startswith(cmd) for cmd in COMMANDS)
 
