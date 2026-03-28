@@ -753,8 +753,9 @@ def handle_client(conn, addr):
                         continue
 
                     timestamp = time.strftime("%Y-%m-%d %I:%M:%S %p")
-                    outbound = f"[Group:{group_name}] [{timestamp}] {username}: {group_text}"
-
+encrypted_group_text = encrypt_at_rest(group_text)
+store_message(username, group_name, encrypted_group_text, "group", timestamp)
+outbound = f"[Group:{group_name}] [{timestamp}] {username}: {group_text}"
                     for member in group["members"]:
                         if member in user_sockets:
                             member_conn = user_sockets[member]
