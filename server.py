@@ -137,6 +137,30 @@ def create_group_db(group_name, owner):
     conn.commit()
     conn.close()
 
+def remove_group_member_db(group_name, username):
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        DELETE FROM group_members
+        WHERE group_name = ? AND username = ?
+    """, (group_name, username))
+
+    conn.commit()
+    conn.close()
+
+def add_group_member_db(group_name, username):
+    conn = sqlite3.connect("chat.db")
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        INSERT OR IGNORE INTO group_members (group_name, username)
+        VALUES (?, ?)
+    """, (group_name, username))
+
+    conn.commit()
+    conn.close()
+
 def load_groups():
     conn = sqlite3.connect("chat.db")
     cursor = conn.cursor()
