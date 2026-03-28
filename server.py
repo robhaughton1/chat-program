@@ -346,19 +346,7 @@ def cleanup_user(username, conn):
         del user_sockets[username]
 
     user_session_keys.pop(username, None)
-    
-    groups_to_delete = []
-    
-    for group_name, group_data in groups.items():
-        if username in group_data["members"]:
-            group_data["members"].remove(username)
-            
-            if group_data["owner"] == username:
-                groups_to_delete.append(group_name)
-            elif not group_data["members"]:
-                groups_to_delete.append(group_name)
-    for group_name in groups_to_delete:
-        del groups[group_name]
+    pending_group_requests.pop(username, None)
     
 
 def handle_client(conn, addr):
@@ -455,7 +443,7 @@ def handle_client(conn, addr):
 
                         if group_name in groups:
                             groups[group_name]["members"].add(username)
-							add_group_member_db(group_name, username)
+                            add_group_member_db(group_name, username)
                             encrypted = encrypt_message(session_key, f"You joined group '{group_name}'.")
                             send_packet(conn, encrypted)
 
@@ -474,7 +462,7 @@ def handle_client(conn, addr):
                         request = pending_group_requests[username]
                         group_name = request["group"]
                         inviter = request["inviter"]
-                        encrypted = encrypt_message(session_key, f"You declinded the invite to '{group_name}'.")
+                        encrypted = encrypt_message(session_key, f"You declined the invite to '{group_name}'.")
                         send_packet(conn, encrypted)
                         if inviter in user_sockets:
 	
@@ -613,7 +601,7 @@ def handle_client(conn, addr):
                         "owner": username,
                         "members": {username}
                     }
-					create_group_db(group_name, username)
+                    create_group_db(group_name, username)
 
                     encrypted = encrypt_message(session_key, f"Group '{group_name}' created.")
                     send_packet(conn, encrypted)
@@ -720,7 +708,7 @@ def handle_client(conn, addr):
                         continue
 
                     group["members"].remove(username)
-					remove_group_member_db(group_name, username)
+                    remove_group_member_db(group_name, username)
                     encrypted = encrypt_message(session_key, f"You left group '{group_name}'.")
                     send_packet(conn, encrypted)
                     continue
@@ -754,9 +742,9 @@ def handle_client(conn, addr):
                         continue
 
                     timestamp = time.strftime("%Y-%m-%d %I:%M:%S %p")
-					encrypted_group_text = encrypt_at_rest(group_text)
-					store_message(username, group_name, encrypted_group_text, "group", timestamp)
-					outbound = f"[Group:{group_name}] [{timestamp}] {username}: {group_text}"
+                    encrypted_group_text = encrypt_at_rest(group_text)
+                    store_message(username, group_name, encrypted_group_text, "group", timestamp)
+                    outbound = f"[Group:{group_name}] [{timestamp}] {username}: {group_text}"
 
                     for member in group["members"]:
                         if member in user_sockets:
@@ -766,41 +754,41 @@ def handle_client(conn, addr):
                             send_packet(member_conn, encrypted_group_msg)
                     continue
 
-				if raw_message.startswith("/group_history "):
-    			parts = raw_message.split(" ", 1)
+                if raw_message.startswith("/group_history "):
+                    parts = raw_message.split(" ", 1)
 
-   				if len(parts) < 2 or not parts[1].strip():
-        			encrypted = encrypt_message(session_key, "Usage: /group_history <group_name>")
-        			send_packet(conn, encrypted)
-        			continue
+                if len(parts) < 2 or not parts[1].strip():
+                    encrypted = encrypt_message(session_key, "Usage: /group_history <group_name>")
+                    send_packet(conn, encrypted)
+                    continue
 
-    			group_name = parts[1].strip()
+                group_name = parts[1].strip()
 
-    			if group_name not in groups:
-        			encrypted = encrypt_message(session_key, f"Group '{group_name}' does not exist.")
-        			send_packet(conn, encrypted)
-        			continue
+                if group_name not in groups:
+                    encrypted = encrypt_message(session_key, f"Group '{group_name}' does not exist.")
+                    send_packet(conn, encrypted)
+                    continue
 
-    			if username not in groups[group_name]["members"]:
-        			encrypted = encrypt_message(session_key, f"You are not a member of '{group_name}'.")
-        			send_packet(conn, encrypted)
-        			continue
+                if username not in groups[group_name]["members"]:
+                    encrypted = encrypt_message(session_key, f"You are not a member of '{group_name}'.")
+                    send_packet(conn, encrypted)
+                    continue
 
-    			group_rows = get_group_messages(group_name)
+                group_rows = get_group_messages(group_name)
 
-    			if not group_rows:
-        			encrypted = encrypt_message(session_key, f"No group history found for '{group_name}'.")
-        			send_packet(conn, encrypted)
-        			continue
+                if not group_rows:
+                    encrypted = encrypt_message(session_key, f"No group history found for '{group_name}'.")
+                    send_packet(conn, encrypted)
+                    continue
 
-    			history_lines = [f"--- Group History: {group_name} ---"]
-    			for sender, recipient, msg, timestamp in group_rows:
-        			history_lines.append(f"[{timestamp}] {sender}: {msg}")
+                history_lines = [f"--- Group History: {group_name} ---"]
+                for sender, recipient, msg, timestamp in group_rows:
+                    history_lines.append(f"[{timestamp}] {sender}: {msg}")
 
-    			history_text = "\n".join(history_lines)
-    			encrypted = encrypt_message(session_key, history_text)
-    			send_packet(conn, encrypted)
-    			continue
+                history_text = "\n".join(history_lines)
+                encrypted = encrypt_message(session_key, history_text)
+                send_packet(conn, encrypted)
+                continue
 
                 if raw_message.startswith("@ai "):
                     prompt = raw_message[len("@ai "):].strip()
