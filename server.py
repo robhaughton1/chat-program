@@ -267,6 +267,7 @@ user_sockets = {}
 user_session_keys = {}
 groups = load_groups()
 pending_group_requests = {}
+state_lock = threading.RLock()
 
 print("Server running with Port 5000...")
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -337,16 +338,17 @@ def ai_response(prompt):
         return f"Artemis error: {e}"
 
 def cleanup_user(username, conn):
-    active_users.discard(username)
+    with state_lock:
+        active_users.discard(username)
 
-    if conn in connected_clients:
-        connected_clients.remove(conn)
-         
-    if username in user_sockets:
-        del user_sockets[username]
+        if conn in connected_clients:
+            connected_clients.remove(conn)
 
-    user_session_keys.pop(username, None)
-    pending_group_requests.pop(username, None)
+        if username in user_sockets:
+            del user_sockets[username]
+
+        user_session_keys.pop(username, None)
+        pending_group_requests.pop(username, None)
     
 
 def handle_client(conn, addr):
@@ -371,11 +373,14 @@ def handle_client(conn, addr):
                 send_packet(conn, get_random_bytes(16).hex())
             password = recv_packet(conn).strip()
 
-            if username in active_users:
+            with state_lock:
+                already_active = username in active_users
+            if already_active:
                 print(f"[DENIED] {username} attempted second login.")
                 send_packet(conn, "Authentication failed.")
-                attempts+= 1
+                attempts += 1
                 continue
+
             if not username or not stored:
                 send_packet(conn, "Invalid username or password.")
                 continue
@@ -385,14 +390,19 @@ def handle_client(conn, addr):
 
             if bcrypt.checkpw(password.encode(), stored_hash):
                 session_key = derive_key(password.encode(), salt)
-                user_session_keys[username] = session_key
+
+                with state_lock:
+                    user_session_keys[username] = session_key
+                    active_users.add(username)
+                    connected_clients.append(conn)
+                    user_sockets[username] = conn
+
                 encrypted = encrypt_message(session_key, "Verified.")
                 send_packet(conn, encrypted)
                 print(f"User '{username}' authenticated successfully.")
-                active_users.add(username)
-                connected_clients.append(conn)
-                user_sockets[username] = conn
+
                 history_rows = get_recent_messages(username)
+
                 if history_rows:
                     history_lines = ["---Global Chat History ---"]
                     for sender, msg, timestamp in history_rows:
