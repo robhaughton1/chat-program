@@ -760,6 +760,7 @@ def handle_client(conn, addr):
                     store_message(username, group_name, encrypted_group_text, "group", timestamp)
                     outbound = f"[Group:{group_name}] [{timestamp}] {username}: {group_text}"
 
+                with state_lock:
                     for member in group["members"]:
                         if member in user_sockets:
                             member_conn = user_sockets[member]
