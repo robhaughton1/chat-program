@@ -119,8 +119,7 @@ try:
         try:
             response = decrypt_message(session_key, ciphertext)
         except (ValueError, KeyError, TypeError):
-            print("\n[LOST CONNECTION] The server has gone offline.")
-            os._exit(1)
+            response = ciphertext
 
         if "Verified" in response:
             time.sleep(0.5)
