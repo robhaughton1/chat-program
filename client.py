@@ -1,13 +1,14 @@
 # pylint: disable=import-error
 """Encrypted chat client for secure messaging."""
 import socket
-from datetime import datetime
 import time
 import ssl
 import threading
 import base64
+import os
 import sys
 import struct
+from datetime import datetime
 from getpass import getpass
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
@@ -70,6 +71,9 @@ def receive_from_server(session_key):
         except (KeyError, TypeError, ValueError) as e:
             print(f"Receive thread error: {e}")
             break
+        except (ConnectionError, BrokenPipeError):
+            print("\n[LOST CONNECTION] The server has gone offline. Closing client...")
+            os._exit(1)
 
 context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
 context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -116,7 +120,7 @@ try:
             response = decrypt_message(session_key, ciphertext)
         except (ValueError, KeyError, TypeError):
             print("\n[LOST CONNECTION] The server has gone offline.")
-            response = ciphertext
+            os._exit(1)
 
         if "Verified" in response:
             time.sleep(0.5)
