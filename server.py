@@ -2,14 +2,13 @@
 import socket
 import threading
 import time
-import json
 import ssl
 import sqlite3
 import base64
-import bcrypt
-import struct
-import requests
 import os
+import struct
+import bcrypt
+import requests
 from Crypto.Cipher import AES
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Random import get_random_bytes
@@ -291,13 +290,13 @@ def load_system_prompt():
 def ai_response(prompt):
     api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not api_key:
-        return ("Artemis error: API key not set.")
+        return "Artemis error: API key not set."
 
     system_prompt = load_system_prompt()
 
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-    
+
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
@@ -326,14 +325,13 @@ def ai_response(prompt):
         message = choice.get("message", {})
         content = message.get("content")
 
+        if content is None:
+            return f"Artemis error: unexpected API response: {data}"
+
         if isinstance(content, str) and content.strip():
             return content.strip()
 
         return "Artemis is thinking, but no visible reply was returned."
-
-        if content is None:
-            return f"Artemis error: unexpected API response: {data}"
-        return content.strip()
     except Exception as e:
         return f"Artemis error: {e}"
 
@@ -349,7 +347,7 @@ def cleanup_user(username, conn):
 
         user_session_keys.pop(username, None)
         pending_group_requests.pop(username, None)
-    
+
 
 def handle_client(conn, addr):
     print(f"Client connected with address{addr}.")
@@ -418,8 +416,8 @@ def handle_client(conn, addr):
             attempts += 1
 
 
-        except Exception as e:
-            print(f"Authentication error: {e}")
+        except (KeyError, ValueError, TypeError) as e:
+            print(f"Authentication error for user 'username': {e}")
             conn.close()
             return
 
@@ -454,28 +452,34 @@ def handle_client(conn, addr):
                         if group_name in groups:
                             groups[group_name]["members"].add(username)
                             add_group_member_db(group_name, username)
-                            encrypted = encrypt_message(session_key, f"You joined group '{group_name}'.")
+                            encrypted = encrypt_message(session_key, f"Joined '{group_name}'.")
                             send_packet(conn, encrypted)
 
                             if inviter in user_sockets:
+
                                 inviter_conn = user_sockets[inviter]
                                 inviter_key = user_session_keys[inviter]
                                 notice = f"{username} accepted your request to join '{group_name}'."
                                 encrypted_notice = encrypt_message(inviter_key, notice)
                                 send_packet(inviter_conn, encrypted_notice)
+
                             else:
-                                encrypted = encrypt_message(session_key, f"Group '{group_name}' no longer exists.")
+
+                                encrypted = encrypt_message(session_key, f"'{group_name}' no longer exists.")
                                 send_packet(conn, encrypted)
+
                             del pending_group_requests[username]
                             continue
+
                     elif lowered== "no":
+
                         request = pending_group_requests[username]
                         group_name = request["group"]
                         inviter = request["inviter"]
-                        encrypted = encrypt_message(session_key, f"You declined the invite to '{group_name}'.")
+                        encrypted = encrypt_message(session_key, f"Declined invite to '{group_name}'.")
                         send_packet(conn, encrypted)
                         if inviter in user_sockets:
-	
+
                             inviter_conn = user_sockets[inviter]
                             inviter_key = user_session_keys[inviter]
                             notice = f"{username} declined your request to join '{group_name}'."
@@ -554,7 +558,7 @@ def handle_client(conn, addr):
                         store_message(username, target_user, encrypted_private, "private", timestamp)
                         conversation_rows = get_private_convo(username, target_user)
                         history_lines= [f"--- Private Conversation with {target_user} ---"]
-                        for sender, recipient, msg, timestamp in conversation_rows:
+                        for sender, _recipient, msg, timestamp in conversation_rows:
                             history_lines.append(f"[{timestamp}] {sender}: {msg}")
                         conversation_text = "\n".join(history_lines)
 
@@ -565,7 +569,7 @@ def handle_client(conn, addr):
 
                         send_packet(target_conn, encrypted_target)
                         send_packet(conn, encrypted_sender)
-                    except Exception as e:
+                    except (ValueError, KeyError, TypeError) as e:
                         print(f"Private message error: {e}")
                         sender_key = user_session_keys[username]
                         encrypted = encrypt_message(sender_key, "Error delivering private message.")
@@ -585,7 +589,7 @@ def handle_client(conn, addr):
                         send_packet(conn, encrypted)
                         continue
                     history_lines = [f"--- Private conversation with {target_user} ---"]
-                    for sender, recipient, msg, timestamp in conversation_rows:
+                    for sender, _recipient, msg, timestamp in conversation_rows:
                         history_lines.append(f"[{timestamp}] {sender}: {msg}")
 
                     history_text = "\n".join(history_lines)
@@ -603,7 +607,7 @@ def handle_client(conn, addr):
                     group_name = parts[1].strip()
 
                     if group_name in groups:
-                        encrypted = encrypt_message(session_key, f"Group '{group_name}' already exists.")
+                        encrypted = encrypt_message(session_key, f"'{group_name}' already exists.")
                         send_packet(conn, encrypted)
                         continue
 
@@ -629,29 +633,29 @@ def handle_client(conn, addr):
                     target_user = parts[2].strip()
 
                     if group_name not in groups:
-                        encrypted = encrypt_message(session_key, f"Group '{group_name}' does not exist.")
+                        encrypted = encrypt_message(session_key, f"'{group_name}' does not exist.")
                         send_packet(conn, encrypted)
                         continue
 
                     group = groups[group_name]
 
                     if group["owner"] != username:
-                        encrypted = encrypt_message(session_key, "Only the group owner can add members.")
+                        encrypted = encrypt_message(session_key, "Only the owner can add members.")
                         send_packet(conn, encrypted)
                         continue
 
                     if target_user not in VALID_USERS:
-                        encrypted = encrypt_message(session_key, f"User '{target_user}' does not exist.")
+                        encrypted = encrypt_message(session_key, f"'{target_user}' does not exist.")
                         send_packet(conn, encrypted)
                         continue
 
                     if target_user in group["members"]:
-                        encrypted = encrypt_message(session_key, f"User '{target_user}' is already in '{group_name}'.")
+                        encrypted = encrypt_message(session_key, f"'{target_user}' is in '{group_name}'.")
                         send_packet(conn, encrypted)
                         continue
 
                     if target_user in pending_group_requests:
-                        encrypted = encrypt_message(session_key, f"User '{target_user}' already has a pending request.")
+                        encrypted = encrypt_message(session_key, f"'{target_user}' has a pending request.")
                         send_packet(conn, encrypted)
                         continue
 
@@ -659,7 +663,7 @@ def handle_client(conn, addr):
                         "group": group_name,
                         "inviter": username
                     }
-                    encrypted = encrypt_message(session_key, f"Join request sent to '{target_user}'.")
+                    encrypted = encrypt_message(session_key, f"Request sent to '{target_user}'.")
                     send_packet(conn, encrypted)
 
                     target_conn = user_sockets[target_user]
@@ -700,20 +704,20 @@ def handle_client(conn, addr):
                     group_name = parts[1].strip()
 
                     if group_name not in groups:
-                        encrypted = encrypt_message(session_key, f"Group '{group_name}' does not exist.")
+                        encrypted = encrypt_message(session_key, f"'{group_name}' does not exist.")
                         send_packet(conn, encrypted)
                         continue
-                        
+
                     group = groups[group_name]
 
                     if username not in group["members"]:
-                        encrypted = encrypt_message(session_key, f"You are not a member of '{group_name}'.")
+                        encrypted = encrypt_message(session_key, "Denied.")
                         send_packet(conn, encrypted)
                         continue
 
                     if group["owner"] == username:
                         del groups[group_name]
-                        encrypted = encrypt_message(session_key, f"You were the owner. Group '{group_name}' was deleted.")
+                        encrypted = encrypt_message(session_key, f"You were the owner, '{group_name}' was deleted.")
                         send_packet(conn, encrypted)
                         continue
 
@@ -727,9 +731,9 @@ def handle_client(conn, addr):
                     parts = raw_message.split(" ", 2)
 
                     if len(parts) < 3:
-                       encrypted = encrypt_message(session_key, "Usage: /gmsg <group_name> <message>")
-                       send_packet(conn, encrypted)
-                       continue
+                        encrypted = encrypt_message(session_key, "Usage: /gmsg <group_name> <message>")
+                        send_packet(conn, encrypted)
+                        continue
 
                     group_name = parts[1].strip()
                     group_text = parts[2].strip()
@@ -740,14 +744,14 @@ def handle_client(conn, addr):
                         continue
 
                     if group_name not in groups:
-                        encrypted = encrypt_message(session_key, f"Group '{group_name}' does not exist.")
+                        encrypted = encrypt_message(session_key, f"'{group_name}' does not exist.")
                         send_packet(conn, encrypted)
                         continue
 
                     group = groups[group_name]
 
                     if username not in group["members"]:
-                        encrypted = encrypt_message(session_key, f"You are not member of '{group_name}'.")
+                        encrypted = encrypt_message(session_key, f"You are not apart of '{group_name}'.")
                         send_packet(conn, encrypted)
                         continue
 
@@ -775,24 +779,24 @@ def handle_client(conn, addr):
                     group_name = parts[1].strip()
 
                     if group_name not in groups:
-                        encrypted = encrypt_message(session_key, f"Group '{group_name}' does not exist.")
+                        encrypted = encrypt_message(session_key, f"'{group_name}' does not exist.")
                         send_packet(conn, encrypted)
                         continue
 
                     if username not in groups[group_name]["members"]:
-                        encrypted = encrypt_message(session_key, f"You are not a member of '{group_name}'.")
+                        encrypted = encrypt_message(session_key, "Denied.")
                         send_packet(conn, encrypted)
                         continue
 
                     group_rows = get_group_messages(group_name)
 
                     if not group_rows:
-                        encrypted = encrypt_message(session_key, f"No group history found for '{group_name}'.")
+                        encrypted = encrypt_message(session_key, f"No history for '{group_name}'.")
                         send_packet(conn, encrypted)
                         continue
 
                     history_lines = [f"--- Group History: {group_name} ---"]
-                    for sender, recipient, msg, timestamp in group_rows:
+                    for sender, _recipient, msg, timestamp in group_rows:
                         history_lines.append(f"[{timestamp}] {sender}: {msg}")
 
                     history_text = "\n".join(history_lines)
@@ -806,11 +810,11 @@ def handle_client(conn, addr):
                         encrypted = encrypt_message(session_key, "Usage: @ai <question>")
                         send_packet(conn, encrypted)
                         continue
-                    try:        
+                    try:
                         ai_reply = ai_response(prompt)
                         encrypted = encrypt_message(session_key, f"Artemis: {ai_reply}")
                         send_packet(conn, encrypted)
-                    except Exception as e:
+                    except (KeyError, TypeError, ValueError) as e:
                         print(f"AI error: {e}")
                         encrypted = encrypt_message(
                             session_key, "Artemis is unavailable right now. Please try again later."
@@ -832,7 +836,7 @@ def handle_client(conn, addr):
 
         time.sleep(1)
 
-    except Exception as e:
+    except (KeyError, ValueError, TypeError) as e:
         print(f"Error with data transfer: {e}")
 
 while True:
