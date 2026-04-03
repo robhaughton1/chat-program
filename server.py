@@ -415,9 +415,11 @@ def handle_client(conn, addr):
             print(f"Authentication failed for user '{username}'.")
             attempts += 1
 
-
+        except ConnectionError:
+            print("Connection issue during login.")
+            break
         except (KeyError, ValueError, TypeError) as e:
-            print(f"Authentication error for user 'username': {e}")
+            print(f"Authentication error {e}")
             conn.close()
             return
 
@@ -760,14 +762,14 @@ def handle_client(conn, addr):
                     store_message(username, group_name, encrypted_group_text, "group", timestamp)
                     outbound = f"[Group:{group_name}] [{timestamp}] {username}: {group_text}"
 
-                with state_lock:
-                    for member in group["members"]:
-                        if member in user_sockets:
-                            member_conn = user_sockets[member]
-                            member_key = user_session_keys[member]
-                            encrypted_group_msg = encrypt_message(member_key, outbound)
-                            send_packet(member_conn, encrypted_group_msg)
-                    continue
+                    with state_lock:
+                        for member in group["members"]:
+                            if member in user_sockets:
+                                member_conn = user_sockets[member]
+                                member_key = user_session_keys[member]
+                                encrypted_group_msg = encrypt_message(member_key, outbound)
+                                send_packet(member_conn, encrypted_group_msg)
+                        continue
 
                 if raw_message == "/group_history" or raw_message.startswith("/group_history "):
                     parts = raw_message.split(" ", 1)
