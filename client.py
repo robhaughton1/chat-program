@@ -65,7 +65,7 @@ def receive_from_server(session_key):
                 sys.exit()
             plaintext = decrypt_message(session_key, ciphertext)
             print(f"\n{plaintext}")
-            if plaintext.startswith("Artemis: "):
+            if "Artemis" in plaintext or "error" in plaintext.lower():
                 WAITING_FOR_AI = False
         except (KeyError, TypeError, ValueError) as e:
             print(f"Receive thread error: {e}")
@@ -114,7 +114,8 @@ try:
 
         try:
             response = decrypt_message(session_key, ciphertext)
-        except Exception: # pylint: disable=broad-exception-caught
+        except (ValueError, KeyError, TypeError):
+            print("\n[LOST CONNECTION] The server has gone offline.")
             response = ciphertext
 
         if "Verified" in response:
