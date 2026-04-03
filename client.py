@@ -15,6 +15,8 @@ from Crypto.Protocol.KDF import PBKDF2
 PBKDF2_ITERATIONS = 100_000
 KEY_LENGTH = 32
 
+WAITING_FOR_AI = False
+
 def derive_key(password, salt):
     """Derive a 32-byte AES key from the given password."""
     return PBKDF2(password, salt, dkLen=KEY_LENGTH, count=PBKDF2_ITERATIONS)
@@ -54,7 +56,7 @@ def recv_packet(sock):
 
 def receive_from_server(session_key):
     """Background thread that receives and decrypts messages from the server."""
-    global waiting_for_ai
+    global WAITING_FOR_AI
     while True:
         try:
             ciphertext = recv_packet(client)
@@ -64,8 +66,8 @@ def receive_from_server(session_key):
             plaintext = decrypt_message(session_key, ciphertext)
             print(f"\n{plaintext}")
             if plaintext.startswith("Artemis: "):
-                waiting_for_ai = False
-        except Exception as e: # pylint: disable=broad-exception-caught
+                WAITING_FOR_AI = False
+        except (KeyError, TypeError, ValueError) as e:
             print(f"Receive thread error: {e}")
             break
 
@@ -77,7 +79,6 @@ context.check_hostname = True
 context.load_verify_locations("cert.pem")
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # IPv4 and TCP insertion
 client = context.wrap_socket(client, server_hostname="localhost")
-waiting_for_ai = False
 
 try:
     client.connect(("localhost", 5000)) # Port and host binding
@@ -137,19 +138,19 @@ try:
         while True:
             time.sleep(1)
 
-            if waiting_for_ai:
+            if WAITING_FOR_AI:
                 print("Waiting for Artemis to respond...")
                 time.sleep(1)
                 continue
 
             message = input("Enter your message: ").strip() # User input text
-            
+
             if message.startswith("@ai"):
                 if message.strip() == "@ai":
                     print("usage: @ai <question>")
                     time.sleep(1)
                     continue
-                waiting_for_ai = True
+                WAITING_FOR_AI = True
 
             if message.lower() == "/exit":
                 encrypted = encrypt_message(session_key, "/exit")
@@ -187,7 +188,7 @@ try:
         if not is_command:
             print("Message sent to server.")
 
-except Exception as e: # pylint: disable=broad-exception-caught
+except (KeyError, ValueError, TypeError) as e:
 
     print(f"Error connecting or sending: {e}")
 client.close()
